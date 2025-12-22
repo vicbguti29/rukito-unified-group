@@ -1,0 +1,115 @@
+Proyecto Lenguajes de Programación
+Título del Proyecto:
+Servidor de Monitoreo Concurrente y Priorización de Alertas para la Cadena de Frío de Carnes Premium (Rukito)
+Integrantes del Grupo:
+Víctor Borbor
+Angello Vásconez 
+1. Problemática a resolver
+Rukito, un restaurante especializado en cortes de carne premium (Instagram, s. f.), enfrenta un alto riesgo financiero debido a la dependencia de sistemas de monitoreo manual y reactivo de su cadena de frío (Wolfenstein, 2023). La Cámara Frigorífica 1 (CF-1) almacena materia prima importada extremadamente costosa (como Vacío Prime y Baby Back Ribs). Si la temperatura de esta cámara falla, como cuando una puerta queda mal cerrada, se incurre en pérdidas de miles de dólares y se arruina el prestigio del restaurante. Los sistemas actuales no pueden manejar la concurrencia de múltiples sensores ni priorizar alertas en tiempo real, lo que podría resultar en una pérdida total antes de que la alerta llegue (30 minutos después). 
+2. Objetivos Propuestos
+Objetivo General:
+Diseñar e implementar un sistema concurrente de monitoreo y alerta para la cadena de frío de Rukito que garantice la detección proactiva de fallas en las cámaras de almacenamiento de carnes premium.
+Objetivos Específicos:
+Implementar el servidor backend con capacidad de recibir y procesar datos de 15 a 20 sensores simultáneamente sin latencia, utilizando concurrencia (Goroutines). 
+Desarrollar una aplicación móvil frontend que muestre un dashboard en tiempo real y permita al usuario (Don Jorge) configurar los parámetros de límites de temperatura y prioridad de las alertas por sensor. 
+Desarrollar un módulo de análisis de datos que calcule la tasa crítica de cambio de temperatura (dT/dt) y genere reportes sobre el tiempo acumulado de riesgo por cámara frigorífica. 
+3. Alcance del Proyecto
+El proyecto se centrará en el desarrollo del sistema de software para el monitoreo y alerta de las cámaras frigoríficas (CF-1 y CF-2) de un solo local de Rukito.
+• Se cubrirá: El desarrollo de la API RESTful concurrente, el módulo de análisis proactivo de datos, la persistencia de datos históricos y una aplicación móvil para la visualización de datos y recepción de alertas.  
+• No se cubrirá: La instalación física y configuración de los 15-20 sensores de temperatura (se simulará la recepción de datos). Tampoco se cubrirá la implementación de servicios de notificación push/SMS de producción, sino la simulación de la recepción de alertas prioritarias en el frontend.  
+4. Características de la Solución
+• Monitoreo Concurrente: El backend podrá recibir datos de múltiples sensores (CF-1, CF-2, refrigeradores) de forma simultánea y eficiente.  
+• Alerta Proactiva: El sistema detectará fallas no solo por superar un umbral, sino por una tasa crítica de subida de temperatura (dT/dt).  
+• Notificación Prioritaria: Las alertas de CF-1 (carnes premium) serán clasificadas como Prioridad 1, garantizando que el mensaje crítico se dispare primero y se muestre de forma destacada en la app móvil.  
+• Dashboard Móvil: Aplicación nativa que permite ver el estado actual de todas las cámaras y el histórico de temperatura.
+5. Requerimientos Funcionales Asignados
+Requerimiento
+Descripción
+Responsable
+Recepción y persistencia de datos(Escritura)
+El sistema  debe recibir datos de forma concurrente de varios sensores y guardar la información en la base de datos
+Angello Vásconez
+(Backend)
+Análisis de riesgo y de predicciones 
+(Lectura)
+Lee los datos históricos de cada sensor almacenado en la base de datos, calculando la tasa de cambio y determinando posibles fallas
+Angello Vásconez
+(Análisis de datos)
+Dashboard de monitoreo en tiempo real
+(Lectura)
+Mostrar en la app móvil el los datos actuales recibidos de los sensores y los gráficos históricos actualizados  
+Victor Borbor
+(Fronted)
+Configuración de los parámetros de las alertas
+(Escritura)
+Permite al usuario establecer los límites de temperatura y la prioridad de las alertas recibidas (baja/media/alta) por sensor
+Victor Borbor
+(Fronted)
+
+7. Arquitectura de la Aplicación
+Tipo de Aplicación: Aplicación móvil.
+Se determinó la elaboración de una aplicación móvil debido a los requerimientos del negocio donde el usuario (don Jorge) necesita recibir alertas en tiempo real de todos los sensores de cada uno de sus locales ya sea que esté dentro o fuera de las instalaciones. Además, una aplicación nativa móvil permite el uso de notificaciones y acceso al dashboard sin necesidad de un navegador de escritorio.
+Patrón de Arquitectura:
+Cliente - Servidor 
+Mobile Client (Flutter/Dart) (Flutter - Build Apps For Any Screen, s. f.): La aplicación móvil actúa como cliente, consumiendo la API y mostrando el dashboard y las alertas.  
+2. API Gateway / Backend Core (Go) (Go Wiki: LearnConcurrency - The Go Programming Language, s. f.): Servicio de alto rendimiento que recibe las peticiones concurrentes de los sensores y gestiona las prioridades.  
+3. Analytics Service (Python): Un microservicio separado, que lee los datos del storage y ejecuta el análisis de riesgo (cálculo de dT/dt) aprovechando librerías como Pandas/NumPy (Pandas - Python Data Analysis Library, s. f.).
+4. Database (MySQL) (MySQL, s. f.): Almacén de datos persistente para todos los registros de temperatura y las configuraciones de alerta. 
+Herramientas y Frameworks:
+Framework: Flutter, utilizado para el frontend multiplataforma(Android/iOS) usando el lenguaje Dart. FastAPI para el backend, un framework de alto rendimiento basado en python.
+API: API RESTful construida con FastAPI, encargada de la comunicación entre la app móvil y el servidor, gestiona la recepción de datos y la entrega del resultado de los análisis.
+Servicios: Base de datos creada usando MySQL, gestionada con el ORM SQLAlchemy para la persistencia y consulta de datos de forma segura.
+8. Lenguajes de Programación
+Back-end:
+Lenguaje de Programación 1: Go (Golang) [Seleccionado]
+Pros y Contras: 
+PROS: Diseño centrado para la concurrencia mediante “Goroutines” permite manejar cientos de peticiones simultáneamente con un consumo de memoria mínimo.
+CONTRAS: No tiene bibliotecas nativas para el manejo y análisis de datos como lo son “Pandas” o “NumPY” haciendo necesario usar un segundo lenguaje como python.
+Front-end:
+Lenguaje de Programación 1: Dart [Seleccionado]
+Pros y Contras:
+PROS: Trabajando junto con Flutter permite compilar el mismo código para diferentes plataformas (Android/iOS) reduciendo la carga de trabajo significativamente.
+CONTRAS: El sistema de tipado estático y "Null Safety" de Dart es muy riguroso; esto requiere un mapeo manual muy preciso de las respuestas JSON que vienen del Backend en Go. Si la estructura de la API cambia ligeramente, la aplicación puede fallar en tiempo de ejecución si los modelos no se actualizan en paralelo.
+
+Análisis de datos:
+Lenguaje de Programación 1: Python [Seleccionado]
+Pros y Contras:
+PROS: Es el único lenguaje que cuenta con el ecosistema necesario (Pandas, NumPy, Scikit-learn) para realizar el procesamiento y limpieza de datos de manera eficiente.
+CONTRAS: El "Global Interpreter Lock" (GIL) limita su capacidad para manejar múltiples procesos simultáneos, haciéndolo lento para servir como servidor web principal.
+9. Prototipo de Baja Fidelidad
+Herramienta de Diseño Utilizada: AMP Generative AI
+Capturas: 
+
+
+
+
+
+
+
+
+
+
+
+10. Implementación
+
+### Backend
+En esta sección se detalla el avance de la implementación de los componentes del sistema.
+
+| Implementación | Responsable | Estado |
+| :--- | :--- | :--- |
+| Dashboard de monitoreo en tiempo real (Lectura) | Victor Borbor | hecho |
+| Configuración de los parámetros de las alertas (Escritura) | Victor Borbor | hecho |
+| Scraping de datos de mercado (Análisis) | Victor Borbor | hecho |
+| Recepción y persistencia de datos (Escritura) | Angello Vásconez | pendiente |
+| Análisis de riesgo y de predicciones (Lectura) | Angello Vásconez | pendiente |
+
+11. Referencias
+Instagram. (s. f.). https://www.instagram.com/reel/DGCF0OxurdL/?igsh=ZXV0dGFkbzBhMHR2
+Wolfenstein, K. (2023, 18 diciembre). Risikomanagement in der Cold Chain: Wie können Ausfälle und Qualitätseinbußen vermieden werden? – Frischelogistik / Kühllogistik. Xpert.Digital. https://xpert.digital/es/gestion-de-riesgos-de-la-cadena-de-frio/?amp=1
+Flutter - Build apps for any screen. (s. f.). https://flutter.dev/
+Go Wiki: LearnConcurrency - the Go programming Language. (s. f.). https://go.dev/wiki/LearnConcurrency
+pandas - Python Data Analysis Library. (s. f.). https://pandas.pydata.org/
+MySQL. (s. f.). GitHub. https://github.com/mysql
+
+
+Arquitectura de Monitoreo Concurrente Rukito (Cliente-Servidor)1. Componentes del SistemaDispositivos de Monitoreo (Sensores):Elementos: Sensor CF-1, Sensor CF-2 y Otros Sensores.Acción: Envía datos (Temperatura, ID) a través de Internet / Red del Local.Backend Core (Concurrencia):Tecnología: Servidor Go (Golang).Función: API Gateway / Recepción.Flujo de entrada: Recibe flujo de datos concurrentes desde la red.Analytics & Reporting:Tecnología: Servicio Python (Análisis de $\frac{dT}{dt}$, Pandas).Relación con Backend: Envía resultados de análisis (Alertas Críticas) y recibe disparadores de análisis.Persistencia (Base de Datos):Tecnología: MySQL Database.Interacciones:Recibe persistencia de datos históricos (Escritura) desde el Backend Go.Provee datos para análisis (Lectura) al Servicio Python.Frontend (App Móvil):Tecnología: App Flutter (Dart).Función: Dashboard y Alertas.Interacciones con Backend:Recibe entrega de datos en tiempo real (Lectura).Envía configuración de límites de alerta (Escritura).Usuario Final:Actor: Don Jorge / Gerente.Interfaz: Visualiza el Dashboard y recibe Notificaciones de Alerta Prioridad 1.2. Flujo de Datos y LógicaLos sensores recolectan temperatura e ID y los envían vía red local/internet.El servidor Go gestiona la concurrencia de los datos entrantes.Los datos se guardan en MySQL y simultáneamente se envían a la App Flutter.El servicio Python lee la base de datos para realizar cálculos complejos (derivadas de temperatura respecto al tiempo) y devuelve alertas críticas al servidor Go.El usuario final recibe información procesada y alertas de alta prioridad en su dispositivo móvil.

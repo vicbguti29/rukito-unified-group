@@ -1,101 +1,27 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.buildlog/
-.history
-.svn/
-migrate_working_dir/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.env
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# Flutter/Dart
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
-.packages
 .pub-cache/
 .pub/
-/build/
+build/
+*.lock
 
-# Symbolication related
-app.*.symbols
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Obfuscation related
-app.*.map.json
-
-# iOS/macOS
-**/ios/**/*.mode1v3
-**/ios/**/*.mode2v3
-**/ios/**/*.moved-aside
-**/ios/**/*.pbxuser
-**/ios/**/*.perspectivev3
-**/ios/**/*.xcconfig
-**/ios/**/*.xcworkspace
-**/ios/**/Flutter/Flutter.framework
-**/ios/**/Flutter/Flutter.podspec
-**/ios/**/Flutter/Generated.xcconfig
-**/ios/**/Flutter/ephemeralflutter_ios_podfile_global.txt
-**/ios/**/Flutter/flutter_export_environment.sh
-**/ios/**/GoogleService-Info.plist
-**/ios/**/ServiceDefinitions.json
-**/ios/Podfile
-**/ios/Podfile.lock
-**/ios/Pods/
-**/ios/Runner.xcodeproj/project.pbxproj
-**/ios/Runner.xcodeproj/xcshareddata/
-**/ios/Runner.xcworkspace/
-
-# macOS
-**/macos/Flutter/GeneratedPluginRegistrant.swift
-**/macos/Flutter/Flutter-Debug.xcconfig
-**/macos/Flutter/Flutter-Release.xcconfig
-**/macos/Flutter/GeneratedPluginRegistrant.swift
-
-# Android/Kotlin
-**/android/**/GeneratedPluginRegistrant.java
-**/android/.gradle/
-**/android/captures/
-**/android/gradlew
-**/android/gradlew.bat
-**/android/key.jks
-**/android/key.properties
-**/android/local.properties
-**/android/**/GeneratedPluginRegistrant.java
-
-# iOS/macOS
-**/ios/**/*Lock.json
-**/ios/**/*.mode1v3
-**/ios/**/*.mode2v3
-**/ios/**/*.moved-aside
-**/ios/**/*.pbxuser
-**/ios/**/*.perspectivev3
-**/ios/**/*.xcbkptlist
-**/ios/**/*.xcscheme
-**/ios/**/*.xcworkspace/
-**/ios/**/Flutter/Flutter.framework
-**/ios/**/Flutter/Flutter.podspec
-**/ios/**/GeneratedPluginRegistrant.swift
-**/ios/Flutter/flutter_export_environment.sh
-**/ios/Pods/
-**/ios/Runner.xcodeproj/
-
-# Web
-lib/generated_plugin_registrant.dart
-
-# Exceptions to above rules.
-!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
+# OS
+.DS_Store
+Thumbs.db
