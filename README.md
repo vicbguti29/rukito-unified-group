@@ -75,14 +75,25 @@ mysql -u root -p < rukito-backend/scripts/setup.sql
 ```
 
 ### 3. Configuración del Entorno
-Asegúrate de que el archivo `.env` en `rukito-backend/` tenga tus credenciales correctas:
+Asegúrate de crear un archivo `.env` en `rukito-backend/` basándote en el ejemplo.
+Define tus credenciales locales:
+
 ```env
+# Base de datos
 DB_HOST=localhost
 DB_PORT=3306
-DB_USER=rukito_user
-DB_PASSWORD=secure_password
+DB_USER=TU_USUARIO_MYSQL
+DB_PASSWORD=TU_CONTRASEÑA_MYSQL
 DB_NAME=rukito
+
+# Servidor Go
 SERVER_PORT=8080
+SERVER_HOST=0.0.0.0
+
+# Modos de Simulación: RANDOM (Producción) | SCENARIO (Testing)
+SIMULATION_MODE=RANDOM
+
+# Python Analytics Service
 PYTHON_SERVICE_URL=http://localhost:8000
 ```
 
@@ -100,11 +111,10 @@ go mod tidy
 # - github.com/joho/godotenv (v1.5.1)
 # - github.com/google/uuid (v1.6.0)
 
-# Opción A: Modo Producción (Simulación Aleatoria)
+# Antes de ejecutar, verificar el modo de ejecución del servidor en el archivo .env: 
+# SIMULATION_MODE=RANDOM (producción) por defecto
+# SIMULATION_MODE=SCENARIO (testing)
 go run cmd/server/main.go
-
-# Opción B: Modo Testing (Escenarios Deterministas)
-# export SIMULATION_MODE=SCENARIO && go run cmd/server/main.go
 ```
 *El servidor escuchará en `http://localhost:8080`.*
 
@@ -151,6 +161,17 @@ cd rukito-backend
 # 4. Verificar Cadena de Valor Completa (Scraping -> Análisis -> Reporte Financiero)
 ./test_analytics_integration.sh
 ```
+
+---
+
+## 📚 Manuales y Documentación
+
+Hemos preparado una serie de manuales detallados de cómo funcionan los servicios del backend de forma independiente y cómo trabajan en conjunto.
+
+*   **[Manual del Backend (Go)](rukito-backend/docs/MANUAL_BACKEND_GO.md):** Guía completa sobre la API, endpoints y estructura del servidor en Go.
+*   **[Manual de Analítica (Python)](rukito-backend/docs/MANUAL_ANALYTICS_PYTHON.md):** Detalles sobre el microservicio de análisis financiero y algoritmos.
+*   **[Manual de Pruebas](rukito-backend/docs/MANUAL_TESTS.md):** Guía para ejecutar y entender la suite de tests automatizados.
+*   **[Arquitectura del Sistema](rukito-backend/docs/SYSTEM_ARCHITECTURE.md):** Visión general técnica y diagramas de la solución.
 
 ---
 
