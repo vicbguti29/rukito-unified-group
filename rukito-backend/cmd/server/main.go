@@ -8,6 +8,7 @@ import (
 
 	"github.com/angello/rukito-backend/internal/api"
 	"github.com/angello/rukito-backend/internal/db"
+	"github.com/angello/rukito-backend/internal/service"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
@@ -20,6 +21,15 @@ func main() {
 
 	// Initialize Database
 	db.InitDB()
+
+	// Select Simulation Mode
+	simMode := os.Getenv("SIMULATION_MODE")
+	if simMode == "SCENARIO" {
+		service.StartScenarioSimulation()
+	} else {
+		// Default: Random "Real" Simulation
+		service.StartSensorSimulation()
+	}
 
 	// Initialize Router
 	r := mux.NewRouter()
@@ -52,6 +62,8 @@ func main() {
 	apiRouter.HandleFunc("/alerts/{id}/read", api.MarkAlertRead).Methods("PATCH")
 	apiRouter.HandleFunc("/config/alerts/{id}", api.GetAlertConfig).Methods("GET")
 	apiRouter.HandleFunc("/config/alerts/{id}", api.UpdateAlertConfig).Methods("PUT")
+	apiRouter.HandleFunc("/reports/{id}", api.GetReport).Methods("GET")
+	apiRouter.HandleFunc("/statistics", api.GetStatistics).Methods("GET")
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
