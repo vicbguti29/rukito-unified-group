@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -65,6 +66,23 @@ func UpdateAlertConfig(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// SINCRONIZACIÓN: Actualizar también los umbrales visuales en la tabla 'chambers'
+	// Asumimos lógica por defecto: Advertencia es 2 grados antes del crítico
+	updateChamberQuery := `
+		UPDATE chambers 
+		SET critical_threshold = ?, warning_threshold = ? 
+		WHERE id = ?`
+	
+	// Warning threshold = MaxTemp - 2.0 (ej: si Max es -18, Warning es -20)
+	// Nota: Para cámaras de frío, "más caliente" es peor, así que warning debe ser MENOR que critical
+	warningThreshold := c.MaxTemp - 2.0
+	
+	_, err = db.DB.Exec(updateChamberQuery, c.MaxTemp, warningThreshold, sensorID)
+	if err != nil {
+		// Logueamos el error pero no fallamos la request principal
+		fmt.Printf("Warning: Failed to sync chamber thresholds: %v\n", err)
 	}
 
 	// Return updated config (fetching it again to be sure)

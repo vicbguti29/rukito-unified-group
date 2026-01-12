@@ -5,11 +5,11 @@ class AlertConfig {
   final String sensorId;
   final double maxTemperature;
   final double minTemperature;
-  final double rateOfChangeThreshold; // °C/min
-  final AlertPriorityLevel priority;
+  final double rateOfChangeThreshold;
+  final int priority; // 1: Low, 2: Medium, 3: High
   final bool isEnabled;
-  final List<String> notificationChannels; // 'sms', 'push', 'email'
-  final List<String> recipients; // teléfonos, correos
+  final List<String> notificationChannels; // ["sms", "push", "email"]
+  final List<String> recipients;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -27,27 +27,13 @@ class AlertConfig {
     required this.updatedAt,
   });
 
-  // Mapea prioridad a string
-  String get priorityLabel {
+  // Helpers para UI
+  AlertPriorityLevel get priorityLevel {
     switch (priority) {
-      case AlertPriorityLevel.low:
-        return 'Baja';
-      case AlertPriorityLevel.medium:
-        return 'Media';
-      case AlertPriorityLevel.high:
-        return 'Alta';
-    }
-  }
-
-  // Mapea prioridad a color
-  String get priorityColor {
-    switch (priority) {
-      case AlertPriorityLevel.low:
-        return '#3498db'; // Azul
-      case AlertPriorityLevel.medium:
-        return '#f39c12'; // Naranja
-      case AlertPriorityLevel.high:
-        return '#e74c3c'; // Rojo
+      case 1: return AlertPriorityLevel.low;
+      case 2: return AlertPriorityLevel.medium;
+      case 3: return AlertPriorityLevel.high;
+      default: return AlertPriorityLevel.medium;
     }
   }
 
@@ -57,16 +43,11 @@ class AlertConfig {
       sensorId: json['sensor_id'] as String,
       maxTemperature: (json['max_temperature'] as num).toDouble(),
       minTemperature: (json['min_temperature'] as num).toDouble(),
-      rateOfChangeThreshold:
-          (json['rate_of_change_threshold'] as num).toDouble(),
-      priority: AlertPriorityLevel.values[json['priority'] as int],
+      rateOfChangeThreshold: (json['rate_of_change_threshold'] as num).toDouble(),
+      priority: json['priority'] as int,
       isEnabled: json['is_enabled'] as bool,
-      notificationChannels: List<String>.from(
-        json['notification_channels'] as List<dynamic>,
-      ),
-      recipients: List<String>.from(
-        json['recipients'] as List<dynamic>,
-      ),
+      notificationChannels: List<String>.from(json['notification_channels'] ?? []),
+      recipients: List<String>.from(json['recipients'] ?? []),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -78,12 +59,12 @@ class AlertConfig {
         'max_temperature': maxTemperature,
         'min_temperature': minTemperature,
         'rate_of_change_threshold': rateOfChangeThreshold,
-        'priority': priority.index,
+        'priority': priority,
         'is_enabled': isEnabled,
         'notification_channels': notificationChannels,
         'recipients': recipients,
-        'created_at': createdAt.toIso8601String(),
-        'updated_at': updatedAt.toIso8601String(),
+        'created_at': createdAt.toUtc().toIso8601String(),
+        'updated_at': updatedAt.toUtc().toIso8601String(),
       };
 
   AlertConfig copyWith({
@@ -92,7 +73,7 @@ class AlertConfig {
     double? maxTemperature,
     double? minTemperature,
     double? rateOfChangeThreshold,
-    AlertPriorityLevel? priority,
+    int? priority,
     bool? isEnabled,
     List<String>? notificationChannels,
     List<String>? recipients,
@@ -104,8 +85,7 @@ class AlertConfig {
       sensorId: sensorId ?? this.sensorId,
       maxTemperature: maxTemperature ?? this.maxTemperature,
       minTemperature: minTemperature ?? this.minTemperature,
-      rateOfChangeThreshold:
-          rateOfChangeThreshold ?? this.rateOfChangeThreshold,
+      rateOfChangeThreshold: rateOfChangeThreshold ?? this.rateOfChangeThreshold,
       priority: priority ?? this.priority,
       isEnabled: isEnabled ?? this.isEnabled,
       notificationChannels: notificationChannels ?? this.notificationChannels,

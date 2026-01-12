@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -14,12 +15,27 @@ func GetReport(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	chamberID := vars["id"]
 
+	startStr := r.URL.Query().Get("start")
+	endStr := r.URL.Query().Get("end")
+	minutes := 30 // Default
+
+	if startStr != "" && endStr != "" {
+		start, err1 := time.Parse(time.RFC3339, startStr)
+		end, err2 := time.Parse(time.RFC3339, endStr)
+		if err1 == nil && err2 == nil {
+			diff := end.Sub(start).Minutes()
+			if diff > 0 {
+				minutes = int(diff)
+			}
+		}
+	}
+
 	pythonURL := os.Getenv("PYTHON_SERVICE_URL")
 	if pythonURL == "" {
 		pythonURL = "http://localhost:8000"
 	}
 
-	targetURL := fmt.Sprintf("%s/analyze/report/%s", pythonURL, chamberID)
+	targetURL := fmt.Sprintf("%s/analyze/report/%s?minutes=%d", pythonURL, chamberID, minutes)
 
 	fmt.Printf("Go Backend: Requesting report from Python service at %s\n", targetURL)
 

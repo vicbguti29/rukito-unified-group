@@ -89,7 +89,7 @@ class ApiService implements IApiService {
           .get(
             Uri.parse(
               '$_baseUrl/readings/$chamberId/history'
-              '?start=${startDate.toIso8601String()}&end=${endDate.toIso8601String()}',
+              '?start=${startDate.toUtc().toIso8601String()}&end=${endDate.toUtc().toIso8601String()}',
             ),
           )
           .timeout(_timeout);

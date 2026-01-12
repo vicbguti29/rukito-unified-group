@@ -47,7 +47,8 @@ class _HistoricalViewState extends State<HistoricalView> {
         endDate: _endDate,
       );
       setState(() {
-        _historicalData = data;
+        // Invertimos el orden para mostrar lo más reciente primero
+        _historicalData = data.reversed.toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -63,7 +64,6 @@ class _HistoricalViewState extends State<HistoricalView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Título
         Text(
           'Histórico de Temperaturas',
           style: Theme.of(context).textTheme.displayMedium,
@@ -77,22 +77,15 @@ class _HistoricalViewState extends State<HistoricalView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Filtros',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+                Text('Filtros', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    // Rango de fechas
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Período:',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                          Text('Período:', style: Theme.of(context).textTheme.bodySmall),
                           const SizedBox(height: 8),
                           Row(
                             children: [
@@ -102,10 +95,7 @@ class _HistoricalViewState extends State<HistoricalView> {
                                     final picked = await showDatePicker(
                                       context: context,
                                       initialDate: _startDate,
-                                      firstDate:
-                                          DateTime.now().subtract(
-                                            const Duration(days: 90),
-                                          ),
+                                      firstDate: DateTime.now().subtract(const Duration(days: 90)),
                                       lastDate: DateTime.now(),
                                     );
                                     if (picked != null) {
@@ -116,9 +106,7 @@ class _HistoricalViewState extends State<HistoricalView> {
                                   child: Container(
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: AppColors.borderColor,
-                                      ),
+                                      border: Border.all(color: AppColors.borderColor),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
@@ -148,9 +136,7 @@ class _HistoricalViewState extends State<HistoricalView> {
                                   child: Container(
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: AppColors.borderColor,
-                                      ),
+                                      border: Border.all(color: AppColors.borderColor),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
@@ -166,16 +152,11 @@ class _HistoricalViewState extends State<HistoricalView> {
                       ),
                     ),
                     const SizedBox(width: 32),
-
-                    // Selector de cámara
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Cámara:',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                          Text('Cámara:', style: Theme.of(context).textTheme.bodySmall),
                           const SizedBox(height: 8),
                           Consumer<ChamberProvider>(
                             builder: (context, chamberProvider, _) {
@@ -190,13 +171,7 @@ class _HistoricalViewState extends State<HistoricalView> {
                                   }
                                 },
                                 items: chambers
-                                    .map(
-                                      (chamber) =>
-                                          DropdownMenuItem<String>(
-                                            value: chamber.id,
-                                            child: Text(chamber.name),
-                                          ),
-                                    )
+                                    .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
                                     .toList(),
                               );
                             },
@@ -212,7 +187,7 @@ class _HistoricalViewState extends State<HistoricalView> {
         ),
         const SizedBox(height: 24),
 
-        // Contenido
+        // Tabla Paginada
         if (_isLoading)
           const Center(child: CircularProgressIndicator())
         else if (_historicalData.isEmpty)
@@ -226,109 +201,89 @@ class _HistoricalViewState extends State<HistoricalView> {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Datos históricos',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  // Tabla de datos
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columns: [
-                        const DataColumn(label: Text('Hora')),
-                        const DataColumn(label: Text('Temperatura')),
-                        const DataColumn(label: Text('Diferencia')),
-                        const DataColumn(label: Text('dT/dt')),
-                        const DataColumn(label: Text('Estado')),
-                      ],
-                      rows: _historicalData
-                          .take(20)
-                          .map(
-                            (reading) => DataRow(
-                              cells: [
-                                DataCell(
-                                  Text(
-                                    reading.formattedTime,
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(
-                                    reading.formattedTemperature,
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(
-                                    '${reading.temperatureDifference > 0 ? '+' : ''}${reading.temperatureDifference.toStringAsFixed(1)}°C',
-                                    style: TextStyle(
-                                      color: reading.temperatureDifference > 0
-                                          ? AppColors.critical
-                                          : AppColors.normal,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(
-                                    reading.formattedRateOfChange,
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                ),
-                                DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: reading.isCritical
-                                          ? AppColors.criticalBackground
-                                          : reading.isWarning
-                                              ? AppColors.warningBackground
-                                              : AppColors.white,
-                                      border: Border.all(
-                                        color: AppColors.borderColor,
-                                      ),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      reading.status,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: reading.isCritical
-                                            ? AppColors.critical
-                                            : reading.isWarning
-                                                ? AppColors.warning
-                                                : AppColors.normal,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
-                  if (_historicalData.length > 20)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Text(
-                        'Mostrando 20 de ${_historicalData.length} registros',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                ],
+              child: SizedBox(
+                width: double.infinity,
+                child: PaginatedDataTable(
+                  header: Text('Datos históricos (${_historicalData.length} registros)'),
+                  rowsPerPage: 10,
+                  availableRowsPerPage: const [10, 20, 50],
+                  onRowsPerPageChanged: (value) {}, // Opcional: manejar cambio
+                  columns: const [
+                    DataColumn(label: Text('Hora')),
+                    DataColumn(label: Text('Temperatura')),
+                    DataColumn(label: Text('Diferencia')),
+                    DataColumn(label: Text('dT/dt')),
+                    DataColumn(label: Text('Estado')),
+                  ],
+                  source: HistoricalDataSource(_historicalData, context),
+                ),
               ),
             ),
           ),
       ],
     );
   }
+}
+
+class HistoricalDataSource extends DataTableSource {
+  final List<TemperatureReading> _data;
+  final BuildContext _context;
+
+  HistoricalDataSource(this._data, this._context);
+
+  @override
+  DataRow? getRow(int index) {
+    if (index >= _data.length) return null;
+    final reading = _data[index];
+
+    return DataRow(cells: [
+      DataCell(Text(reading.formattedTime, style: Theme.of(_context).textTheme.bodySmall)),
+      DataCell(Text(reading.formattedTemperature, style: Theme.of(_context).textTheme.bodySmall)),
+      DataCell(
+        Text(
+          '${reading.temperatureDifference > 0 ? '+' : ''}${reading.temperatureDifference.toStringAsFixed(1)}°C',
+          style: TextStyle(
+            color: reading.temperatureDifference > 0 ? AppColors.critical : AppColors.normal,
+            fontSize: 12,
+          ),
+        ),
+      ),
+      DataCell(Text(reading.formattedRateOfChange, style: Theme.of(_context).textTheme.bodySmall)),
+      DataCell(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: reading.isCritical
+                ? AppColors.criticalBackground
+                : reading.isWarning
+                    ? AppColors.warningBackground
+                    : AppColors.white,
+            border: Border.all(color: AppColors.borderColor),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            reading.status,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: reading.isCritical
+                  ? AppColors.critical
+                  : reading.isWarning
+                      ? AppColors.warning
+                      : AppColors.normal,
+            ),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  @override
+  bool get isRowCountApproximate => false;
+
+  @override
+  int get rowCount => _data.length;
+
+  @override
+  int get selectedRowCount => 0;
 }

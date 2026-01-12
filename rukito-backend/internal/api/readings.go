@@ -39,7 +39,7 @@ func GetReadings(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var readings []models.TemperatureReading
+	readings := []models.TemperatureReading{}
 	for rows.Next() {
 		var tr models.TemperatureReading
 		// Note: The struct has TargetTemp, MinTemp, MaxTemp which are not in the readings table
@@ -95,7 +95,7 @@ func GetReadingHistory(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var readings []models.TemperatureReading
+	readings := []models.TemperatureReading{}
 	for rows.Next() {
 		var tr models.TemperatureReading
 		err := rows.Scan(&tr.ID, &tr.SensorID, &tr.Temperature, &tr.RateOfChange, &tr.Status, &tr.Timestamp)

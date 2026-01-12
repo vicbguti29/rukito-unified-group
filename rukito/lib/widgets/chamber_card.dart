@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/cold_chamber.dart';
 import '../theme/app_colors.dart';
 import '../services/api_service.dart';
+import '../screens/chamber_config_screen.dart';
 
 class ChamberCard extends StatelessWidget {
   final ColdChamber chamber;
@@ -79,6 +80,21 @@ class ChamberCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+                // Botón de Configuración
+                IconButton(
+                  icon: const Icon(Icons.settings, size: 20, color: AppColors.mediumGray),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChamberConfigScreen(
+                          chamberId: chamber.id,
+                          chamberName: chamber.name,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

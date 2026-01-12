@@ -60,12 +60,12 @@ class TemperatureReading {
 
   factory TemperatureReading.fromJson(Map<String, dynamic> json) {
     return TemperatureReading(
-      id: json['id'] as String,
+      id: json['id'].toString(), // Convertir int a String
       sensorId: json['sensor_id'] as String,
       temperature: (json['temperature'] as num).toDouble(),
-      targetTemperature: (json['target_temperature'] as num).toDouble(),
-      minTemperature: (json['min_temperature'] as num).toDouble(),
-      maxTemperature: (json['max_temperature'] as num).toDouble(),
+      targetTemperature: (json['target_temperature'] as num?)?.toDouble() ?? 0.0,
+      minTemperature: (json['min_temperature'] as num?)?.toDouble() ?? 0.0,
+      maxTemperature: (json['max_temperature'] as num?)?.toDouble() ?? 0.0,
       rateOfChange: (json['rate_of_change'] as num).toDouble(),
       timestamp: DateTime.parse(json['timestamp'] as String),
       status: json['status'] as String,
