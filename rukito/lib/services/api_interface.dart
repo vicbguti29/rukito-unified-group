@@ -27,4 +27,8 @@ abstract class IApiService {
   });
   Future<Map<String, dynamic>> getStatistics();
   Future<bool> healthCheck();
+
+  // ==================== USUARIO ====================
+  Future<UserProfile> getUserProfile();
+  Future<UserProfile> updateUserProfile(UserProfile user);
 }

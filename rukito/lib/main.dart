@@ -28,6 +28,9 @@ class RukitoApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => AlertProvider(apiService: apiService),
         ),
+        ChangeNotifierProvider(
+          create: (_) => UserProvider(apiService: apiService)..loadProfile(),
+        ),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

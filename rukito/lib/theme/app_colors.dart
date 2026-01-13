@@ -11,7 +11,8 @@ class AppColors {
   static const Color darkGray = Color(0xFF1a1a1a);
   static const Color mediumGray = Color(0xFF888888);
   static const Color lightGray = Color(0xFFcccccc);
-  static const Color veryLightGray = Color(0xFFf5f5f5);
+  // Fondo Premium Indigo-Gray (Limpio y profesional)
+  static const Color veryLightGray = Color(0xFFE8EAF6); 
   static const Color white = Color(0xFFffffff);
 
   // Fondos especiales

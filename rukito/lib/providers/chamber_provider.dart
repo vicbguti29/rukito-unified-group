@@ -37,10 +37,10 @@ class ChamberProvider extends ChangeNotifier {
   }
 
   int get criticalChamberCount =>
-      _chambers.where((c) => c.currentTemperature > c.criticalThreshold).length;
+      _chambers.where((c) => c.status == ChamberStatus.criticalHot || c.status == ChamberStatus.criticalCold).length;
 
   int get warningChamberCount =>
-      _chambers.where((c) => c.currentTemperature > c.warningThreshold).length;
+      _chambers.where((c) => c.status == ChamberStatus.warningHot).length;
 
   // ==================== MÉTODOS ====================
 

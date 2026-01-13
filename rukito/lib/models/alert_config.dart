@@ -1,96 +1,196 @@
 enum AlertPriorityLevel { low, medium, high }
 
-class AlertConfig {
-  final String id;
-  final String sensorId;
-  final double maxTemperature;
-  final double minTemperature;
-  final double rateOfChangeThreshold;
-  final int priority; // 1: Low, 2: Medium, 3: High
-  final bool isEnabled;
-  final List<String> notificationChannels; // ["sms", "push", "email"]
-  final List<String> recipients;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+class AlertThresholds {
+  final double criticalCold;
+  final double target;
+  final double warningHot;
+  final double criticalHot;
+  final double rateOfChange;
 
-  AlertConfig({
-    required this.id,
-    required this.sensorId,
-    required this.maxTemperature,
-    required this.minTemperature,
-    required this.rateOfChangeThreshold,
-    required this.priority,
-    required this.isEnabled,
-    required this.notificationChannels,
-    required this.recipients,
-    required this.createdAt,
-    required this.updatedAt,
+  AlertThresholds({
+    required this.criticalCold,
+    required this.target,
+    required this.warningHot,
+    required this.criticalHot,
+    required this.rateOfChange,
   });
 
-  // Helpers para UI
-  AlertPriorityLevel get priorityLevel {
-    switch (priority) {
-      case 1: return AlertPriorityLevel.low;
-      case 2: return AlertPriorityLevel.medium;
-      case 3: return AlertPriorityLevel.high;
-      default: return AlertPriorityLevel.medium;
-    }
-  }
-
-  factory AlertConfig.fromJson(Map<String, dynamic> json) {
-    return AlertConfig(
-      id: json['id'] as String,
-      sensorId: json['sensor_id'] as String,
-      maxTemperature: (json['max_temperature'] as num).toDouble(),
-      minTemperature: (json['min_temperature'] as num).toDouble(),
-      rateOfChangeThreshold: (json['rate_of_change_threshold'] as num).toDouble(),
-      priority: json['priority'] as int,
-      isEnabled: json['is_enabled'] as bool,
-      notificationChannels: List<String>.from(json['notification_channels'] ?? []),
-      recipients: List<String>.from(json['recipients'] ?? []),
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+  factory AlertThresholds.fromJson(Map<String, dynamic> json) {
+    return AlertThresholds(
+      criticalCold: (json['critical_cold'] as num).toDouble(),
+      target: (json['target'] as num).toDouble(),
+      warningHot: (json['warning_hot'] as num).toDouble(),
+      criticalHot: (json['critical_hot'] as num).toDouble(),
+      rateOfChange: (json['rate_of_change'] as num).toDouble(),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
+        'critical_cold': criticalCold,
+        'target': target,
+        'warning_hot': warningHot,
+        'critical_hot': criticalHot,
+        'rate_of_change': rateOfChange,
+      };
+
+  AlertThresholds copyWith({
+    double? criticalCold,
+    double? target,
+    double? warningHot,
+    double? criticalHot,
+    double? rateOfChange,
+  }) {
+    return AlertThresholds(
+      criticalCold: criticalCold ?? this.criticalCold,
+      target: target ?? this.target,
+      warningHot: warningHot ?? this.warningHot,
+      criticalHot: criticalHot ?? this.criticalHot,
+      rateOfChange: rateOfChange ?? this.rateOfChange,
+    );
+  }
+}
+
+class NotificationAction {
+  final List<String> channels;
+  final List<String> targetRoles;
+
+  NotificationAction({
+    required this.channels,
+    required this.targetRoles,
+  });
+
+  factory NotificationAction.fromJson(Map<String, dynamic> json) {
+    return NotificationAction(
+      channels: List<String>.from(json['channels'] ?? []),
+      targetRoles: List<String>.from(json['target_roles'] ?? []),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'channels': channels,
+        'target_roles': targetRoles,
+      };
+
+  NotificationAction copyWith({
+    List<String>? channels,
+    List<String>? targetRoles,
+  }) {
+    return NotificationAction(
+      channels: channels ?? this.channels,
+      targetRoles: targetRoles ?? this.targetRoles,
+    );
+  }
+}
+
+class NotificationConfig {
+  final NotificationAction onWarningHot;
+  final NotificationAction onCriticalHot;
+  final NotificationAction onCriticalCold;
+
+  NotificationConfig({
+    required this.onWarningHot,
+    required this.onCriticalHot,
+    required this.onCriticalCold,
+  });
+
+  factory NotificationConfig.fromJson(Map<String, dynamic> json) {
+    return NotificationConfig(
+      onWarningHot: NotificationAction.fromJson(json['on_warning_hot'] ?? {}),
+      onCriticalHot: NotificationAction.fromJson(json['on_critical_hot'] ?? {}),
+      onCriticalCold: NotificationAction.fromJson(json['on_critical_cold'] ?? {}),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'on_warning_hot': onWarningHot.toJson(),
+        'on_critical_hot': onCriticalHot.toJson(),
+        'on_critical_cold': onCriticalCold.toJson(),
+      };
+      
+  NotificationConfig copyWith({
+    NotificationAction? onWarningHot,
+    NotificationAction? onCriticalHot,
+    NotificationAction? onCriticalCold,
+  }) {
+    return NotificationConfig(
+      onWarningHot: onWarningHot ?? this.onWarningHot,
+      onCriticalHot: onCriticalHot ?? this.onCriticalHot,
+      onCriticalCold: onCriticalCold ?? this.onCriticalCold,
+    );
+  }
+}
+
+class AlertConfig {
+  final String? id; // Opcional, ya que a veces viene solo sensor_id
+  final String sensorId;
+  final AlertThresholds thresholds;
+  final NotificationConfig notifications;
+  final bool isEnabled;
+  final DateTime updatedAt;
+
+  // Constructor
+  AlertConfig({
+    this.id,
+    required this.sensorId,
+    required this.thresholds,
+    required this.notifications,
+    required this.isEnabled,
+    required this.updatedAt,
+  });
+
+  // Deprecated Getters para compatibilidad temporal (Legacy Support)
+  @Deprecated('Use thresholds.criticalHot')
+  double get maxTemperature => thresholds.criticalHot;
+  
+  @Deprecated('Use thresholds.criticalCold')
+  double get minTemperature => thresholds.criticalCold;
+  
+  @Deprecated('Use thresholds.rateOfChange')
+  double get rateOfChangeThreshold => thresholds.rateOfChange;
+  
+  @Deprecated('Use notifications.onCriticalHot.channels')
+  List<String> get notificationChannels => notifications.onCriticalHot.channels;
+
+  @Deprecated('Use notifications.onCriticalHot.targetRoles')
+  List<String> get recipients => notifications.onCriticalHot.targetRoles;
+
+
+  factory AlertConfig.fromJson(Map<String, dynamic> json) {
+    return AlertConfig(
+      id: json['id'] as String?,
+      sensorId: json['sensor_id'] as String,
+      thresholds: AlertThresholds.fromJson(json['thresholds'] ?? {}),
+      notifications: NotificationConfig.fromJson(json['notifications'] ?? {}),
+      isEnabled: json['is_enabled'] as bool? ?? true,
+      updatedAt: json['updated_at'] != null 
+          ? DateTime.parse(json['updated_at'] as String) 
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        if (id != null) 'id': id,
         'sensor_id': sensorId,
-        'max_temperature': maxTemperature,
-        'min_temperature': minTemperature,
-        'rate_of_change_threshold': rateOfChangeThreshold,
-        'priority': priority,
+        'thresholds': thresholds.toJson(),
+        'notifications': notifications.toJson(),
         'is_enabled': isEnabled,
-        'notification_channels': notificationChannels,
-        'recipients': recipients,
-        'created_at': createdAt.toUtc().toIso8601String(),
         'updated_at': updatedAt.toUtc().toIso8601String(),
       };
 
   AlertConfig copyWith({
     String? id,
     String? sensorId,
-    double? maxTemperature,
-    double? minTemperature,
-    double? rateOfChangeThreshold,
-    int? priority,
+    AlertThresholds? thresholds,
+    NotificationConfig? notifications,
     bool? isEnabled,
-    List<String>? notificationChannels,
-    List<String>? recipients,
-    DateTime? createdAt,
     DateTime? updatedAt,
   }) {
     return AlertConfig(
       id: id ?? this.id,
       sensorId: sensorId ?? this.sensorId,
-      maxTemperature: maxTemperature ?? this.maxTemperature,
-      minTemperature: minTemperature ?? this.minTemperature,
-      rateOfChangeThreshold: rateOfChangeThreshold ?? this.rateOfChangeThreshold,
-      priority: priority ?? this.priority,
+      thresholds: thresholds ?? this.thresholds,
+      notifications: notifications ?? this.notifications,
       isEnabled: isEnabled ?? this.isEnabled,
-      notificationChannels: notificationChannels ?? this.notificationChannels,
-      recipients: recipients ?? this.recipients,
-      createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }

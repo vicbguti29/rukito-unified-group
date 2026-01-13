@@ -1,4 +1,4 @@
-enum ChamberStatus { online, warning, offline }
+enum ChamberStatus { normal, warningHot, criticalHot, criticalCold, offline }
 
 class ColdChamber {
   final String id;
@@ -6,8 +6,6 @@ class ColdChamber {
   final String content;
   final double currentTemperature;
   final double targetTemperature;
-  final double criticalThreshold;
-  final double warningThreshold;
   final double rateOfChange;
   final ChamberStatus status;
   final DateTime lastUpdate;
@@ -21,8 +19,6 @@ class ColdChamber {
     required this.content,
     required this.currentTemperature,
     required this.targetTemperature,
-    required this.criticalThreshold,
-    required this.warningThreshold,
     required this.rateOfChange,
     required this.status,
     required this.lastUpdate,
@@ -52,64 +48,80 @@ class ColdChamber {
     return 'Hace ${difference.inDays}d';
   }
 
-  // Determina color de borde según estado
+  // Determina color de borde según estado (Hex strings para uso general, pero preferible usar Theme)
   String get borderColor {
-    if (status == ChamberStatus.offline) return '#e74c3c'; // Rojo
-    if (currentTemperature > criticalThreshold)
-      return '#e74c3c'; // Rojo crítico
-    if (currentTemperature > warningThreshold)
-      return '#f39c12'; // Naranja advertencia
-    return '#2ecc71'; // Verde normal
-  }
-
-  // Determina color de fondo según estado
-  String get backgroundColor {
-    if (status == ChamberStatus.offline || currentTemperature > criticalThreshold)
-      return '#fff5f5'; // Fondo rojo claro
-    if (currentTemperature > warningThreshold)
-      return '#fffbf0'; // Fondo naranja claro
-    return '#ffffff'; // Blanco normal
+    switch (status) {
+      case ChamberStatus.criticalHot:
+      case ChamberStatus.criticalCold:
+        return '#e74c3c'; // Rojo
+      case ChamberStatus.warningHot:
+        return '#f39c12'; // Naranja
+      case ChamberStatus.normal:
+        return '#2ecc71'; // Verde
+      case ChamberStatus.offline:
+        return '#95a5a6'; // Gris
+    }
   }
 
   // Emoji de estado
   String get statusEmoji {
     switch (status) {
-      case ChamberStatus.online:
+      case ChamberStatus.normal:
         return '✓';
-      case ChamberStatus.warning:
+      case ChamberStatus.warningHot:
         return '⚠️';
+      case ChamberStatus.criticalHot:
+        return '🔥';
+      case ChamberStatus.criticalCold:
+        return '❄️';
       case ChamberStatus.offline:
-        return '✗';
+        return '⚡';
     }
   }
 
   // Texto de estado
   String get statusText {
-    if (currentTemperature > criticalThreshold) return 'CRÍTICO';
-    if (currentTemperature > warningThreshold) return 'ADVERTENCIA';
-    if (status == ChamberStatus.offline) return 'Desconectado';
-    return 'Normal';
+    switch (status) {
+      case ChamberStatus.normal:
+        return 'Normal';
+      case ChamberStatus.warningHot:
+        return 'Precaución';
+      case ChamberStatus.criticalHot:
+        return 'Crítico Calor';
+      case ChamberStatus.criticalCold:
+        return 'Crítico Frío';
+      case ChamberStatus.offline:
+        return 'Desconectado';
+    }
   }
 
   factory ColdChamber.fromJson(Map<String, dynamic> json) {
     return ColdChamber(
       id: json['id'] as String,
       name: json['name'] as String,
-      content: json['content'] as String,
+      content: json['content'] as String? ?? 'Contenido General',
       currentTemperature: (json['current_temperature'] as num).toDouble(),
-      targetTemperature: (json['target_temperature'] as num).toDouble(),
-      criticalThreshold: (json['critical_threshold'] as num).toDouble(),
-      warningThreshold: (json['warning_threshold'] as num).toDouble(),
+      targetTemperature: (json['target_temperature'] as num?)?.toDouble() ?? -18.0, // Default fallback
       rateOfChange: (json['rate_of_change'] as num).toDouble(),
-      status: ChamberStatus.values[json['status'] as int],
+      status: _parseStatus(json['status'] as String?),
       lastUpdate: DateTime.parse(json['last_update'] as String),
-      recentTemperatures: List<double>.from(
-        (json['recent_temperatures'] as List<dynamic>)
-            .map((x) => (x as num).toDouble()),
-      ),
+      recentTemperatures: json['recent_temperatures'] != null 
+          ? List<double>.from((json['recent_temperatures'] as List<dynamic>).map((x) => (x as num).toDouble()))
+          : [],
       isActive: json['is_active'] as bool? ?? true,
-      location: json['location'] as String,
+      location: json['location'] as String? ?? 'Principal',
     );
+  }
+
+  static ChamberStatus _parseStatus(String? status) {
+    switch (status) {
+      case 'NORMAL': return ChamberStatus.normal;
+      case 'WARNING_HOT': return ChamberStatus.warningHot;
+      case 'CRITICAL_HOT': return ChamberStatus.criticalHot;
+      case 'CRITICAL_COLD': return ChamberStatus.criticalCold;
+      case 'OFFLINE': return ChamberStatus.offline;
+      default: return ChamberStatus.normal;
+    }
   }
 
   Map<String, dynamic> toJson() => {
@@ -118,15 +130,23 @@ class ColdChamber {
         'content': content,
         'current_temperature': currentTemperature,
         'target_temperature': targetTemperature,
-        'critical_threshold': criticalThreshold,
-        'warning_threshold': warningThreshold,
         'rate_of_change': rateOfChange,
-        'status': status.index,
+        'status': _statusToString(status),
         'last_update': lastUpdate.toIso8601String(),
         'recent_temperatures': recentTemperatures,
         'is_active': isActive,
         'location': location,
       };
+      
+  String _statusToString(ChamberStatus status) {
+    switch (status) {
+      case ChamberStatus.normal: return 'NORMAL';
+      case ChamberStatus.warningHot: return 'WARNING_HOT';
+      case ChamberStatus.criticalHot: return 'CRITICAL_HOT';
+      case ChamberStatus.criticalCold: return 'CRITICAL_COLD';
+      case ChamberStatus.offline: return 'OFFLINE';
+    }
+  }
 
   ColdChamber copyWith({
     String? id,
@@ -134,8 +154,6 @@ class ColdChamber {
     String? content,
     double? currentTemperature,
     double? targetTemperature,
-    double? criticalThreshold,
-    double? warningThreshold,
     double? rateOfChange,
     ChamberStatus? status,
     DateTime? lastUpdate,
@@ -149,8 +167,6 @@ class ColdChamber {
       content: content ?? this.content,
       currentTemperature: currentTemperature ?? this.currentTemperature,
       targetTemperature: targetTemperature ?? this.targetTemperature,
-      criticalThreshold: criticalThreshold ?? this.criticalThreshold,
-      warningThreshold: warningThreshold ?? this.warningThreshold,
       rateOfChange: rateOfChange ?? this.rateOfChange,
       status: status ?? this.status,
       lastUpdate: lastUpdate ?? this.lastUpdate,

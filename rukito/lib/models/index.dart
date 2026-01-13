@@ -3,3 +3,4 @@ export 'temperature_reading.dart';
 export 'alert.dart';
 export 'cold_chamber.dart';
 export 'alert_config.dart';
+export 'user_profile.dart';

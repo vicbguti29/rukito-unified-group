@@ -275,4 +275,48 @@ class ApiService implements IApiService {
       return false;
     }
   }
+
+  // ==================== USUARIO ====================
+
+  /// Obtiene el perfil del usuario actual
+  @override
+  Future<UserProfile> getUserProfile() async {
+    try {
+      final response = await _httpClient
+          .get(
+            Uri.parse('$_baseUrl/users/profile'),
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        return UserProfile.fromJson(json.decode(response.body));
+      } else {
+        throw Exception('Error al obtener perfil: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error en getUserProfile: $e');
+    }
+  }
+
+  /// Actualiza el perfil del usuario actual
+  @override
+  Future<UserProfile> updateUserProfile(UserProfile user) async {
+    try {
+      final response = await _httpClient
+          .put(
+            Uri.parse('$_baseUrl/users/profile'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(user.toJson()),
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        return UserProfile.fromJson(json.decode(response.body));
+      } else {
+        throw Exception('Error al actualizar perfil: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error en updateUserProfile: $e');
+    }
+  }
 }

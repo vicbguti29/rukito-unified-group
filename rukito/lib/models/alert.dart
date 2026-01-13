@@ -1,85 +1,69 @@
 import 'package:intl/intl.dart';
 
-enum AlertPriority { p1, p2, p3 }
+enum AlertSeverity { WARNING, CRITICAL }
 
-enum AlertType {
-  temperatureCritical,
-  temperatureWarning,
-  doorOpen,
-  powerFailure,
-  maintenanceRequired,
-  normalOperation,
-  smsNotification,
-}
+enum AlertCategory { HOT_TEMP, COLD_TEMP, RAPID_CHANGE, SENSOR_OFFLINE }
 
 class Alert {
   final String id;
   final String title;
   final String description;
-  final AlertPriority priority;
-  final AlertType type;
+  final AlertSeverity severity;
+  final AlertCategory category;
   final String sensorId;
   final DateTime timestamp;
   final bool isRead;
   final double? estimatedCost;
   final String? affectedContent;
   final String? suggestedAction;
+  final List<String> channels; // Nuevo campo: ['PUSH', 'SMS', 'EMAIL']
 
   Alert({
     required this.id,
     required this.title,
     required this.description,
-    required this.priority,
-    required this.type,
+    required this.severity,
+    required this.category,
     required this.sensorId,
     required this.timestamp,
     this.isRead = false,
     this.estimatedCost,
     this.affectedContent,
     this.suggestedAction,
+    this.channels = const [],
   });
 
-  // Obtiene el emoji según tipo
+  // Obtiene el emoji según categoría
   String get emoji {
-    switch (type) {
-      case AlertType.temperatureCritical:
-        return '🚨';
-      case AlertType.temperatureWarning:
-        return '⚠️';
-      case AlertType.doorOpen:
-        return '🚪';
-      case AlertType.powerFailure:
-        return '⚡';
-      case AlertType.maintenanceRequired:
-        return '🔧';
-      case AlertType.normalOperation:
-        return 'ℹ️';
-      case AlertType.smsNotification:
-        return '📢';
+    switch (category) {
+      case AlertCategory.HOT_TEMP:
+        return '🔥';
+      case AlertCategory.COLD_TEMP:
+        return '❄️';
+      case AlertCategory.RAPID_CHANGE:
+        return '📉';
+      case AlertCategory.SENSOR_OFFLINE:
+        return '📡';
     }
   }
 
-  // Obtiene el color según prioridad
+  // Obtiene el color según severidad
   String get colorHex {
-    switch (priority) {
-      case AlertPriority.p1:
+    switch (severity) {
+      case AlertSeverity.CRITICAL:
         return '#e74c3c'; // Rojo
-      case AlertPriority.p2:
+      case AlertSeverity.WARNING:
         return '#f39c12'; // Naranja
-      case AlertPriority.p3:
-        return '#3498db'; // Azul
     }
   }
 
-  // Obtiene la etiqueta de prioridad
-  String get priorityLabel {
-    switch (priority) {
-      case AlertPriority.p1:
-        return 'P1';
-      case AlertPriority.p2:
-        return 'P2';
-      case AlertPriority.p3:
-        return 'P3';
+  // Obtiene la etiqueta de severidad
+  String get severityLabel {
+    switch (severity) {
+      case AlertSeverity.CRITICAL:
+        return 'CRÍTICO';
+      case AlertSeverity.WARNING:
+        return 'ADVERTENCIA';
     }
   }
 
@@ -91,78 +75,93 @@ class Alert {
     if (difference.inMinutes < 1) {
       return 'Hace unos segundos';
     } else if (difference.inMinutes < 60) {
-      return 'Hace ${difference.inMinutes} minuto${difference.inMinutes > 1 ? 's' : ''}';
+      return 'Hace ${difference.inMinutes} min';
     } else if (difference.inHours < 24) {
-      return 'Hace ${difference.inHours} hora${difference.inHours > 1 ? 's' : ''}';
+      return 'Hace ${difference.inHours} h';
     } else {
-      return DateFormat('dd/MM/yyyy HH:mm').format(timestamp);
+      return DateFormat('dd/MM HH:mm').format(timestamp);
     }
   }
 
-  // Determina si debe reproducir sonido
-  bool get shouldPlaySound => priority == AlertPriority.p1;
-
-  // Determina si debe animar (pulsación)
-  bool get shouldAnimate => priority == AlertPriority.p1;
-
   // Determina si es crítica
-  bool get isCritical => priority == AlertPriority.p1;
+  bool get isCritical => severity == AlertSeverity.CRITICAL;
 
   factory Alert.fromJson(Map<String, dynamic> json) {
     return Alert(
       id: json['id'] as String,
       title: json['title'] as String,
       description: json['description'] as String,
-      priority: AlertPriority.values[json['priority'] as int],
-      type: AlertType.values[json['type'] as int],
+      severity: _parseSeverity(json['severity'] as String?),
+      category: _parseCategory(json['category'] as String?),
       sensorId: json['sensor_id'] as String,
       timestamp: DateTime.parse(json['timestamp'] as String),
       isRead: json['is_read'] as bool? ?? false,
       estimatedCost: (json['estimated_cost'] as num?)?.toDouble(),
       affectedContent: json['affected_content'] as String?,
       suggestedAction: json['suggested_action'] as String?,
+      channels: json['channels'] != null 
+          ? List<String>.from(json['channels']) 
+          : [],
     );
+  }
+
+  static AlertSeverity _parseSeverity(String? value) {
+    if (value == 'CRITICAL') return AlertSeverity.CRITICAL;
+    return AlertSeverity.WARNING;
+  }
+
+  static AlertCategory _parseCategory(String? value) {
+    switch (value) {
+      case 'HOT_TEMP': return AlertCategory.HOT_TEMP;
+      case 'COLD_TEMP': return AlertCategory.COLD_TEMP;
+      case 'RAPID_CHANGE': return AlertCategory.RAPID_CHANGE;
+      case 'SENSOR_OFFLINE': return AlertCategory.SENSOR_OFFLINE;
+      default: return AlertCategory.HOT_TEMP;
+    }
   }
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
         'description': description,
-        'priority': priority.index,
-        'type': type.index,
+        'severity': severity == AlertSeverity.CRITICAL ? 'CRITICAL' : 'WARNING',
+        'category': category.toString().split('.').last,
         'sensor_id': sensorId,
         'timestamp': timestamp.toIso8601String(),
         'is_read': isRead,
         'estimated_cost': estimatedCost,
         'affected_content': affectedContent,
         'suggested_action': suggestedAction,
+        'channels': channels,
       };
 
   Alert copyWith({
     String? id,
     String? title,
     String? description,
-    AlertPriority? priority,
-    AlertType? type,
+    AlertSeverity? severity,
+    AlertCategory? category,
     String? sensorId,
     DateTime? timestamp,
     bool? isRead,
     double? estimatedCost,
     String? affectedContent,
     String? suggestedAction,
+    List<String>? channels,
   }) {
     return Alert(
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
-      priority: priority ?? this.priority,
-      type: type ?? this.type,
+      severity: severity ?? this.severity,
+      category: category ?? this.category,
       sensorId: sensorId ?? this.sensorId,
       timestamp: timestamp ?? this.timestamp,
       isRead: isRead ?? this.isRead,
       estimatedCost: estimatedCost ?? this.estimatedCost,
       affectedContent: affectedContent ?? this.affectedContent,
       suggestedAction: suggestedAction ?? this.suggestedAction,
+      channels: channels ?? this.channels,
     );
   }
 }

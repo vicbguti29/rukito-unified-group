@@ -9,7 +9,7 @@ class TemperatureReading {
   final double maxTemperature;
   final double rateOfChange; // dT/dt en °C/min
   final DateTime timestamp;
-  final String status; // CRÍTICO, ADVERTENCIA, NORMAL
+  final String status; // NORMAL, WARNING_HOT, CRITICAL_HOT, CRITICAL_COLD
 
   TemperatureReading({
     required this.id,
@@ -49,14 +49,25 @@ class TemperatureReading {
     }
   }
 
-  // Determina si está en estado crítico
-  bool get isCritical => status == 'CRÍTICO';
+  // Determina si está en estado crítico (Calor o Frío)
+  bool get isCritical => status == 'CRITICAL_HOT' || status == 'CRITICAL_COLD';
 
   // Determina si está en estado de advertencia
-  bool get isWarning => status == 'ADVERTENCIA';
+  bool get isWarning => status == 'WARNING_HOT';
 
   // Determina si está normal
   bool get isNormal => status == 'NORMAL';
+  
+  // Texto amigable para UI
+  String get statusDisplay {
+    switch (status) {
+      case 'CRITICAL_HOT': return 'CRÍTICO CALOR';
+      case 'CRITICAL_COLD': return 'CRÍTICO FRÍO';
+      case 'WARNING_HOT': return 'ADVERTENCIA';
+      case 'NORMAL': return 'NORMAL';
+      default: return status;
+    }
+  }
 
   factory TemperatureReading.fromJson(Map<String, dynamic> json) {
     return TemperatureReading(
