@@ -95,14 +95,30 @@ class _ChamberConfigScreenState extends State<ChamberConfigScreen> {
   Future<void> _saveConfig() async {
     if (_config == null) return;
     
+    // VALIDACIÓN LOCAL (Client-Side)
+    final criticalCold = double.tryParse(_minTempController.text) ?? -30.0;
+    final target = double.tryParse(_targetTempController.text) ?? -20.0;
+    final warningHot = double.tryParse(_warningTempController.text) ?? -15.0;
+    final criticalHot = double.tryParse(_maxTempController.text) ?? -10.0;
+
+    // Regla de Oro: Secuencia Lógica Térmica
+    if (!(criticalCold < target && target < warningHot && warningHot < criticalHot)) {
+      _showErrorSnackBar(
+        'Inconsistencia en los niveles de temperatura: Para un monitoreo correcto, '
+        'asegúrate de mantener la siguiente secuencia jerárquica: '
+        'Crítico Frío < Objetivo < Advertencia < Crítico Calor.'
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
     try {
       // 1. Construir nuevos umbrales
       final newThresholds = AlertThresholds(
-        criticalCold: double.tryParse(_minTempController.text) ?? -30.0,
-        target: double.tryParse(_targetTempController.text) ?? -20.0,
-        warningHot: double.tryParse(_warningTempController.text) ?? -15.0,
-        criticalHot: double.tryParse(_maxTempController.text) ?? -10.0,
+        criticalCold: criticalCold,
+        target: target,
+        warningHot: warningHot,
+        criticalHot: criticalHot,
         rateOfChange: double.tryParse(_rateController.text) ?? 1.0,
       );
 
@@ -224,7 +240,7 @@ class _ChamberConfigScreenState extends State<ChamberConfigScreen> {
                                 Expanded(
                                   child: _buildSunkenInput(
                                     controller: _warningTempController,
-                                    label: 'Temp. Advertencia',
+                                    label: 'Temperatura Advertencia',
                                     suffix: '°C',
                                     icon: Icons.warning_amber_rounded,
                                     iconColor: Colors.orange,
@@ -250,6 +266,10 @@ class _ChamberConfigScreenState extends State<ChamberConfigScreen> {
                               suffix: '°C/min',
                               icon: Icons.show_chart_rounded,
                               iconColor: Colors.indigo,
+                              infoTooltip: 'Velocidad máxima permitida de cambio de temperatura.\n\n'
+                                  '• Mayor valor (> 1.5): Menos sensible. Tolera aperturas de puerta breves.\n'
+                                  '• Menor valor (< 0.5): Muy sensible. Detecta fallos de aislamiento rápidamente.\n\n'
+                                  'Rango aceptable sugerido: 0.5 - 2.0 °C/min.',
                             ),
                           ],
                         ),
@@ -276,6 +296,28 @@ class _ChamberConfigScreenState extends State<ChamberConfigScreen> {
                             ),
                             const SizedBox(height: 24),
                             _buildNotificationActions(),
+                            const SizedBox(height: 24),
+                            // INFO DE DESTINATARIO
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.info_outline, size: 20, color: Colors.grey.shade600),
+                                  const SizedBox(width: 10),
+                                  const Expanded(
+                                    child: Text(
+                                      "Las notificaciones se enviarán al Administrador Principal (Don Jorge).",
+                                      style: TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
 
@@ -426,11 +468,39 @@ class _ChamberConfigScreenState extends State<ChamberConfigScreen> {
     );
   }
 
-  Widget _buildSunkenInput({required TextEditingController controller, required String label, required String suffix, required IconData icon, required Color iconColor}) {
+  Widget _buildSunkenInput({
+    required TextEditingController controller, 
+    required String label, 
+    required String suffix, 
+    required IconData icon, 
+    required Color iconColor,
+    String? infoTooltip,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B), fontSize: 12)),
+        Row(
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF64748B), fontSize: 12)),
+            if (infoTooltip != null) ...[
+              const SizedBox(width: 8),
+              Tooltip(
+                message: infoTooltip,
+                triggerMode: TooltipTriggerMode.tap,
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.all(16),
+                showDuration: const Duration(seconds: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))],
+                ),
+                textStyle: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+                child: Icon(Icons.info_outline_rounded, size: 18, color: Colors.blueGrey.shade300),
+              ),
+            ],
+          ],
+        ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),

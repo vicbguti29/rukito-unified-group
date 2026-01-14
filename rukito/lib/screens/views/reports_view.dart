@@ -143,6 +143,40 @@ class _ReportsViewState extends State<ReportsView> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // BANNER DE CONFIABILIDAD (Nuevo Ubicación)
+                if (((_reportData!['uptime_percentage'] as num?)?.toDouble() ?? 0) < 85.0)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 24),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.critical.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.critical.withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.report_problem_rounded, color: AppColors.critical, size: 32),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Confiabilidad de Datos Crítica (< 85%)",
+                                style: const TextStyle(color: AppColors.critical, fontWeight: FontWeight.w800, fontSize: 15),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "El análisis financiero y térmico no es confiable debido a la alta pérdida de conexión con el sensor.",
+                                style: TextStyle(color: AppColors.critical.withOpacity(0.8), fontSize: 13, height: 1.2),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 _buildKpiGrid(),
                 const SizedBox(height: 24),
 
@@ -486,9 +520,9 @@ class _ReportsViewState extends State<ReportsView> {
       alertsColor = AppColors.warning;
     }
 
-    // 3. Confiabilidad: Umbrales 98% y 85%
+    // 3. Confiabilidad: Umbrales 95% y 85%
     Color uptimeColor;
-    if (uptime > 98.0) {
+    if (uptime >= 95.0) {
       uptimeColor = AppColors.normal;
     } else if (uptime >= 85.0) {
       uptimeColor = AppColors.warning;
@@ -502,12 +536,12 @@ class _ReportsViewState extends State<ReportsView> {
         : (hoursAtRisk >= 1.5 ? "ADVERTENCIA: Exposición moderada. Verificar calidad." : "ACEPTABLE: Exposición < 1.5h protegida por inercia térmica.");
 
     String uptimeAnalysis;
-    if (uptime > 98.0) {
+    if (uptime >= 95.0) {
       uptimeAnalysis = "ÓPTIMO: Sensor operando con alta precisión y disponibilidad.";
     } else if (uptime >= 85.0) {
       uptimeAnalysis = "REVISIÓN: Se detectan pérdidas de señal intermitentes. Programar mantenimiento técnico.";
     } else {
-      uptimeAnalysis = "CRÍTICO: Pérdida masiva de datos (>15%). El monitoreo no es confiable. Revisar conectividad.";
+      uptimeAnalysis = "CRÍTICO: Pérdida masiva de datos (>85%). El monitoreo no es confiable. Revisar conectividad.";
     }
 
     String costAnalysis = estimatedCost > 1000

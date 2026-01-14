@@ -103,7 +103,17 @@ class _DashboardViewState extends State<DashboardView> {
                   const SizedBox(height: 40),
       
                   // 2. SECCIÓN DE FRIGORÍFICOS (Ahora Abajo)
-                  _buildSectionTitle('Monitoreo de Frigoríficos', Icons.kitchen),
+                  _buildSectionTitle(
+                    'Monitoreo de Frigoríficos', 
+                    Icons.kitchen,
+                    infoTooltip: 'Guía de Lectura:\n\n'
+                        '• Gráfico (Curva Sólida): Tendencia real de las últimas lecturas.\n'
+                        '• Línea Punteada Verde: Temperatura Objetivo ideal.\n\n'
+                        'Colores de Estado:\n'
+                        '🟢 Verde: Operación Normal\n'
+                        '🟠 Naranja: Advertencia (Precaución)\n'
+                        '🔴 Rojo: Peligro (Calor o Frío Extremo)'
+                  ),
                   const SizedBox(height: 16),
                   
                   GridView.builder(
@@ -132,7 +142,7 @@ class _DashboardViewState extends State<DashboardView> {
     );
   }
 
-  Widget _buildSectionTitle(String title, IconData icon) {
+  Widget _buildSectionTitle(String title, IconData icon, {String? infoTooltip}) {
     return Row(
       children: [
         Container(
@@ -153,6 +163,23 @@ class _DashboardViewState extends State<DashboardView> {
             letterSpacing: 0.5,
           ),
         ),
+        if (infoTooltip != null) ...[
+          const SizedBox(width: 8),
+          Tooltip(
+            message: infoTooltip,
+            triggerMode: TooltipTriggerMode.tap,
+            margin: const EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.all(16),
+            showDuration: const Duration(seconds: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B), // Slate 800
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))],
+            ),
+            textStyle: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+            child: Icon(Icons.info_outline_rounded, size: 22, color: Colors.blueGrey.shade300),
+          ),
+        ],
       ],
     );
   }

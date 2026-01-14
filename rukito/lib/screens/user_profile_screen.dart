@@ -139,11 +139,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 color: color.withOpacity(0.1),
                 shape: BoxShape.circle,
                 border: Border.all(color: color.withOpacity(0.2), width: 4),
-              ),
-              child: Center(
-                child: Text(
-                  user.name.substring(0, 1).toUpperCase(),
-                  style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: color),
+                image: const DecorationImage(
+                  image: AssetImage('assets/images/bello.png'),
+                  fit: BoxFit.cover,
                 ),
               ),
             ),

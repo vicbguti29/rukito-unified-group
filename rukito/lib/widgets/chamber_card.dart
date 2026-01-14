@@ -202,8 +202,23 @@ class ChamberCard extends StatelessWidget {
                           gridData: FlGridData(show: false),
                           titlesData: FlTitlesData(show: false),
                           borderData: FlBorderData(show: false),
-                          minY: chamber.recentTemperatures.reduce((a, b) => a < b ? a : b) - 1,
-                          maxY: chamber.recentTemperatures.reduce((a, b) => a > b ? a : b) + 1,
+                          // Escala Dinámica que incluye el Target
+                          minY: (chamber.recentTemperatures.reduce((a, b) => a < b ? a : b) < chamber.targetTemperature 
+                              ? chamber.recentTemperatures.reduce((a, b) => a < b ? a : b) 
+                              : chamber.targetTemperature) - 1,
+                          maxY: (chamber.recentTemperatures.reduce((a, b) => a > b ? a : b) > chamber.targetTemperature 
+                              ? chamber.recentTemperatures.reduce((a, b) => a > b ? a : b) 
+                              : chamber.targetTemperature) + 1,
+                          extraLinesData: ExtraLinesData(
+                            horizontalLines: [
+                              HorizontalLine(
+                                y: chamber.targetTemperature,
+                                color: AppColors.normal.withOpacity(0.5),
+                                strokeWidth: 1.5,
+                                dashArray: [4, 4],
+                              ),
+                            ],
+                          ),
                           lineBarsData: [
                             LineChartBarData(
                               spots: chamber.recentTemperatures.asMap().entries.map((e) {

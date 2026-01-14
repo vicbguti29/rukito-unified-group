@@ -253,7 +253,7 @@ class MockApiService implements IApiService {
         'alert_causes': {'Pico Transitorio': 1},
         'hours_at_risk': 0.1, 
         'estimated_cost': 0,
-        'uptime_percentage': 99.8,
+        'uptime_percentage': 40.0,
         'avg_rate_of_change': 0.3,
         'monthly_cost': 0,
         'total_risk_hours': 0.1,
