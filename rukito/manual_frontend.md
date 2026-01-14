@@ -221,6 +221,7 @@ Gestión de datos de contacto para la recepción de alertas.
   "role": "admin",
   "avatar_url": null
 }
+```
 
 ---
 
@@ -240,4 +241,4 @@ Esta sección detalla discrepancias conocidas entre el diseño y la implementaci
 ### 3. Conectividad en Tiempo Real
 *   **Estado:** Simulación por Polling.
 *   **Detalle:** El frontend solicita actualizaciones periódicas. No se han implementado WebSockets para notificaciones instantáneas ("Push Real").
-```
+

@@ -69,8 +69,8 @@ Para levantar toda la infraestructura del servidor (Responsabilidad: Angello Vá
 ### 2. Configuración de Base de Datos
 Ejecuta el script SQL para crear la base de datos y cargar datos iniciales:
 ```bash
-# Desde la raíz del repositorio backend
-mysql -u root -p < scripts/setup.sql
+# Desde la raíz del repositorio (rukito-unified-group/)
+mysql -u root -p < rukito-backend/scripts/setup.sql
 ```
 
 ### 3. Configuración del Entorno
