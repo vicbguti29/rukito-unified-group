@@ -1,6 +1,7 @@
 #!/bin/bash
 
-ANALYTICS_DIR="analytics"
+# Ajuste de ruta: Asumimos que el script está en /tests y analytics está en la raíz (../analytics)
+ANALYTICS_DIR="../analytics"
 PYTHON_URL="http://localhost:8000"
 
 echo "=== PRUEBA DE INTEGRACIÓN: ANALÍTICA Y MERCADO ==="
