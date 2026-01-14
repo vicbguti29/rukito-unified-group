@@ -5,8 +5,8 @@ El **Backend Core** es el cerebro operativo del sistema Rukito. Desarrollado en 
 
 **Responsabilidades:**
 1.  **Ingestión de Datos:** Recibir y procesar lecturas de temperatura simultáneas.
-2.  **Monitoreo en Tiempo Real:** Evaluar cada lectura entrante contra umbrales de seguridad instantáneamente.
-3.  **Gestión de Alertas:** Generar notificaciones críticas y evitar el "ruido" (spam) mediante deduplicación.
+2.  **Monitoreo en Tiempo Real:** Evaluar cada lectura entrante contra umbrales de seguridad granulares instantáneamente.
+3.  **Gestión de Alertas:** Generar notificaciones críticas basadas en estados (`WARNING`, `CRITICAL`) y evitar el "ruido" mediante deduplicación.
 4.  **API Gateway:** Servir datos al Frontend y actuar como puente hacia el servicio de Analítica (Python).
 
 ---
@@ -16,14 +16,16 @@ El proyecto sigue una estructura modular estándar en Go ("Clean Architecture" s
 
 ```
 rukito-backend/
+├── analytics/            # Servicio de Analítica en Python (Ver MANUAL_ANALYTICS_PYTHON.md)
 ├── cmd/
 │   └── server/
 │       └── main.go       # Punto de entrada. Carga configuración y arranca servicios.
 ├── internal/
-│   ├── api/              # Capa de Transporte (HTTP Handlers).
+│   ├── api/              # Capa de Transporte (HTTP Handlers y Rutas).
 │   ├── db/               # Capa de Infraestructura (Conexión MySQL).
-│   ├── models/           # Definiciones de Estructuras de Datos (Structs).
+│   ├── models/           # Definiciones de Estructuras de Datos (Structs JSON).
 │   └── service/          # Lógica de Negocio (Simulación, Alertas).
+├── tests/                # Suite de pruebas de integración y lógica.
 └── .env                  # Variables de entorno (No subir al repo).
 ```
 
@@ -37,75 +39,165 @@ El corazón del sistema reside en `internal/service/sensor_service.go`. Utiliza 
 *   **Sensores (Productores):**
     *   Al iniciar, el sistema lanza una **Goroutine independiente** para cada sensor configurado (`CF-1`, `CF-2`, `REF-3`).
     *   Cada sensor tiene su propio ciclo de vida (`Ticker`) y genera datos cada 5 segundos.
-    *   Los datos se envían a un **Canal (`chan DataPoint`)** centralizado. Esto evita condiciones de carrera y bloqueos.
+    *   Los datos se envían a un **Canal (`chan DataPoint`)** centralizado. Esto evita condiciones de carrera.
 
 *   **Worker Pool (Consumidor):**
-    *   Una función `processSensorData` escucha constantemente el canal.
-    *   Procesa los datos uno a uno en orden de llegada (FIFO), pero a una velocidad extremadamente alta, permitiendo manejar miles de sensores virtuales.
+    *   La función `processSensorData` consume el canal.
+    *   **Cache de Configuración:** Mantiene una copia en memoria de los umbrales de alerta (`alert_configs`) que se actualiza cada 5 segundos desde la BD. Esto permite evaluar reglas sin latencia de I/O.
 
-### 3.2. Lógica de Cálculo y Alertas
-Dentro del ciclo de procesamiento, ocurre la magia en tiempo real:
+### 3.2. Lógica de Evaluación Granular
+Al recibir una lectura, el sistema evalúa dinámicamente el estado usando 4 umbrales configurables:
 
-1.  **Cálculo Instantáneo de $dT/dt$:**
-    *   El sistema mantiene un mapa en memoria RAM (`lastStates`) con la última lectura conocida de cada sensor.
-    *   Al llegar un nuevo dato, calcula la diferencia con el anterior para obtener la **Tasa de Cambio** instantánea (`rate_of_change`).
-    *   *Ventaja:* Este cálculo toma nanosegundos y no requiere consultas lentas a la base de datos.
+1.  **Estados:**
+    *   `CRITICAL_HOT`: Si T > Umbral Crítico Calor.
+    *   `WARNING_HOT`: Si T > Umbral Advertencia Calor.
+    *   `CRITICAL_COLD`: Si T < Umbral Crítico Frío.
+    *   `NORMAL`: En rango seguro.
 
-2.  **Evaluación de Estado:**
-    *   Compara la temperatura actual con los umbrales definidos (hardcoded para la simulación: -18°C para CF-1, etc.).
-    *   Determina el estado: `NORMAL`, `ADVERTENCIA` o `CRÍTICO`.
+2.  **Generación de Alertas:**
+    *   Si el estado es crítico o advertencia, se verifica si ya se envió una alerta recientemente (Ventana de 2 minutos).
+    *   Si aplica, se inserta en la tabla `alerts` con la severidad (`CRITICAL`/`WARNING`) y categoría (`HOT_TEMP`/`COLD_TEMP`) correspondientes.
 
-3.  **Generación de Alertas (con Anti-Spam):**
-    *   Si el estado es `CRÍTICO`, el sistema consulta otro mapa en memoria (`lastAlertTime`).
-    *   **Regla de Negocio:** Solo se genera una nueva alerta en la base de datos si han pasado más de **2 minutos** desde la última alerta para ese sensor. Esto previene saturar la tabla `alerts` con mensajes repetidos cada 5 segundos.
+### 3.3. Base de Datos (Esquema Granular)
+El backend utiliza MySQL con un esquema relacional optimizado.
 
-### 3.3. Persistencia (Base de Datos)
-El backend utiliza `database/sql` con el driver nativo de MySQL.
-*   **Inserción:** Cada lectura se guarda en `temperature_readings`.
-*   **Actualización:** Se actualiza el registro de la cámara en `chambers` para reflejar el estado actual ("Snapshot").
+#### A. Tabla `users` (Usuarios y Roles)
+Gestión de perfiles y destinatarios de notificaciones.
+*   `id`: INT (PK).
+*   `full_name`, `email`, `phone_number`: Datos de contacto.
+*   `role`: ENUM ('admin', 'manager', 'staff'). Define permisos y recepción de alertas.
+
+#### B. Tabla `chambers` (Cámaras)
+Inventario físico de equipos.
+*   `id`: VARCHAR (PK, ej: 'CF-1').
+*   `name`: Nombre descriptivo.
+*   `updated_at`: Timestamp de la última señal de vida (Heartbeat).
+*   *Nota:* Ya no almacena umbrales ni temperaturas actuales (se calculan o consultan en tiempo real).
+
+#### C. Tabla `alert_configs` (Reglas de Negocio)
+Define la "física" y notificaciones de cada cámara.
+*   `sensor_id`: FK a `chambers`.
+*   `threshold_critical_cold`, `threshold_target`, `threshold_warning_hot`, `threshold_critical_hot`: DECIMAL. Los 4 límites térmicos.
+*   `actions_critical_hot` (JSON): Reglas de notificación (canales y roles) para cada estado.
+
+#### D. Tabla `temperature_readings` (Historial)
+Log inmutable de lecturas.
+*   `status`: ENUM ('NORMAL', 'WARNING_HOT', 'CRITICAL_HOT', 'CRITICAL_COLD'). Estado calculado al momento de la lectura.
+*   `temperature`: DECIMAL. Valor real.
+
+#### E. Tabla `alerts` (Incidentes)
+Registro de eventos notificados.
+*   `severity`: ENUM ('WARNING', 'CRITICAL').
+*   `category`: ENUM ('HOT_TEMP', 'COLD_TEMP', etc.).
+*   `is_read`: BOOLEAN. Estado de gestión.
+*   `channels`: JSON. Lista de canales por los que se intentó notificar (ej: `["email", "push"]`).
 
 ---
 
-## 4. Modos de Operación
-El comportamiento del backend se controla mediante la variable de entorno `SIMULATION_MODE` en el archivo `.env` o al ejecutar el comando.
+## 4. API REST (Especificación de Endpoints)
 
-| Modo | Valor Variable | Descripción | Uso Recomendado |
-| :--- | :--- | :--- | :--- |
-| **Random (Default)** | `RANDOM` | Los sensores generan variaciones térmicas aleatorias pequeñas (+/- 0.5°C). El sistema suele permanecer estable. | **Producción / Demo General** |
-| **Scenario** | `SCENARIO` | Ejecuta un guion determinista. `CF-1` inicia crítico y se arregla. `CF-2` inicia bien y falla. | **Testing Automático / QA** |
+El backend expone endpoints JSON en el puerto **8080**. A continuación se detalla su uso por vista del Frontend.
+
+### A. Dashboard (Vista Principal)
+**Endpoint:** `GET /api/chambers`
+*   **Uso:** Renderizar tarjetas de estado en tiempo real.
+*   **Lógica:** Realiza un JOIN complejo para obtener la cámara + su última lectura + su objetivo configurado.
+*   **Estructura JSON:**
+    ```json
+    [
+      {
+        "id": "CF-1",
+        "name": "Cámara Carnes",
+        "current_temperature": -16.5,
+        "status": "WARNING_HOT",
+        "recent_temperatures": [-16.0, -16.2, -16.5, ...] // Para Sparkline
+      }
+    ]
+    ```
+
+### B. Reportes y Análisis
+**Endpoint:** `GET /api/reports/{id}?start=...&end=...`
+*   **Uso:** Gráficos financieros y diagnósticos.
+*   **Lógica:** Proxy hacia el servicio de Python. Calcula el rango en minutos y delega el análisis pesado.
+*   **Estructura JSON:**
+    ```json
+    {
+      "hours_at_risk": 2.5,
+      "estimated_cost": 500.00,
+      "alert_causes": {"Puerta Abierta": 5},
+      "uptime_percentage": 92.0,
+      "analysis_risk_text": "ALTO RIESGO: Se detectaron brechas...",
+      "analysis_cost_text": "Impacto financiero significativo...",
+      "analysis_rate_text": "Inestabilidad térmica severa..."
+    }
+    ```
+
+### C. Historial de Temperaturas
+**Endpoint:** `GET /api/readings/{id}/history?start=...&end=...`
+*   **Uso:** Tabla paginada y gráfico de línea histórico.
+*   **Lógica:** Consulta directa a `temperature_readings` con filtros de fecha.
+
+### D. Centro de Alertas
+**Endpoint:** `GET /api/alerts`
+*   **Uso:** Listado de notificaciones.
+*   **Endpoint:** `PATCH /api/alerts/{id}/read`
+*   **Uso:** Marcar alerta como leída (Círculo azul desaparece).
+
+### E. Configuración
+**Endpoint:** `GET /api/config/alerts/{id}`
+**Endpoint:** `PUT /api/config/alerts/{id}`
+*   **Uso:** Formulario de configuración de umbrales.
+*   **Validación:** El backend rechaza configuraciones físicamente imposibles (ej: `Critical Cold > Target`).
+*   **Estructura JSON:**
+    ```json
+    {
+      "thresholds": {
+        "critical_cold": -30.0,
+        "target": -20.0,
+        "warning_hot": -15.0,
+        "critical_hot": -10.0
+      },
+      "notifications": { ... }
+    }
+    ```
+
+### F. Perfil de Usuario
+**Endpoint:** `GET /api/users/profile`
+**Endpoint:** `PUT /api/users/profile`
+*   **Uso:** Gestión de datos de contacto del administrador (Don Jorge).
 
 ---
 
-## 5. API REST e Integración
-El backend expone endpoints JSON en el puerto **8080**.
-
-*   **Endpoints Directos (CRUD):**
-    *   `GET /api/chambers`: Consulta rápida a MySQL.
-    *   `GET /api/readings/{id}`: Historial reciente.
-    *   `GET /api/alerts`: Notificaciones activas.
-
-*   **Endpoints Proxy (Gateway):**
-    *   `GET /api/reports/{id}`: **No procesa datos**. Recibe la petición y la reenvía internamente al microservicio de Python (Puerto 8000). Devuelve la respuesta de Python tal cual al cliente. Esto hace transparente para el Frontend el hecho de que existen dos servicios.
-
----
-
-## 6. Comandos de Ejecución
+## 5. Comandos de Ejecución
 
 **Instalar Dependencias:**
 ```bash
 go mod tidy
 ```
 
-**Iniciar Servidor (Modo Normal):**
+**Iniciar Servidor:**
 ```bash
 go run cmd/server/main.go
 ```
+El servidor iniciará automáticamente la simulación de sensores y escuchará en el puerto 8080.
 
-**Iniciar Servidor (Modo Test de Escenarios):**
+---
 
-Cambiar la siguiente linea en el archivo **.env** de rukito-backend
+## 6. Roadmap / Futuras Implementaciones
 
-```bash
- # Modos de Simulación: RANDOM (Producción) | SCENARIO (Testing)
-SIMULATION_MODE=SCENARIO
-```
+### A. Estadísticas Globales
+**Endpoint:** `GET /api/statistics`
+*   **Función:** Proxy hacia `/analyze/statistics` del servicio de Python.
+*   **Estado:** Disponible pero no integrado en el Frontend actual.
+
+### B. Envío Real de Notificaciones
+Actualmente, el sistema registra la alerta en la BD y simula el envío. La integración con proveedores (Twilio, SendGrid) está pendiente.
+
+### C. Enrutamiento Dinámico de Alertas
+La configuración de alertas (`alert_configs`) soporta reglas como `target_roles: ["technician"]`.
+*   **Futuro:** El backend deberá consultar la tabla `users` para encontrar los correos con rol 'technician' y enviarles la alerta específica.
+*   **Actual:** Todas las alertas se asumen para el administrador principal (ID 1).
+
+### D. Gestión Multi-Usuario
+La tabla `users` está diseñada para soportar múltiples cuentas y roles, pero el sistema opera en modo monousuario (Admin).
+*   **Pendiente:** Endpoints para crear usuarios (`POST /users`), Login (JWT) y gestión de permisos.

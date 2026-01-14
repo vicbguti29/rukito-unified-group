@@ -1,72 +1,78 @@
 # Manual de Pruebas y Validación (Test Suite)
 
 ## 1. Introducción
-Rukito cuenta con una suite de pruebas automatizada basada en scripts de Bash y verificaciones con `curl` y Python. Estas pruebas cubren desde la disponibilidad básica de los servicios hasta la lógica de negocio compleja.
+Rukito cuenta con una suite de pruebas automatizada robusta y organizada. Las pruebas cubren desde la disponibilidad básica de los servicios hasta la lógica de negocio compleja, integridad de datos y casos borde.
 
-Todos los scripts se encuentran en la raíz de `rukito-backend/`.
+Todos los scripts se encuentran en la carpeta: `rukito-backend/tests/`.
+
+**Consideraciones Previas:**
+*   Asegúrese de que ambos servicios (Go en puerto 8080, Python en puerto 8000) estén corriendo.
+*   Algunas pruebas modifican temporalmente la base de datos (inyectan datos de prueba), pero están diseñadas para limpiar después de sí mismas.
 
 ---
 
-## 2. Scripts de Prueba
+## 2. Scripts de Prueba Activos
 
-### 2.1. `test_endpoints.sh` (Pruebas CRUD)
-*   **Objetivo:** Verificar que la API REST de Go responde correctamente a todas las operaciones de lectura y escritura.
+### 2.1. `test_full_integration_suite.sh` (Contrato API)
+*   **Objetivo:** Verificar que el Backend cumple estrictamente con el contrato JSON esperado por el Frontend.
 *   **Alcance:**
-    *   Health Check.
-    *   Listado de Cámaras y Lecturas.
-    *   Lectura y Actualización de Configuraciones.
-    *   Gestión de Alertas.
-*   **Ejecución:** `./test_endpoints.sh`
-*   **Señal de Éxito:** JSONs válidos en la salida de cada paso.
+    *   Prueba TODOS los endpoints (`/chambers`, `/reports`, `/alerts`, `/config`, `/users`).
+    *   Valida la existencia de claves críticas (ej: `thresholds`, `alert_causes`).
+*   **Uso:** Ejecutar antes de cualquier entrega al equipo de Frontend.
+*   **Señal de Éxito:** "🎉 TODOS LOS TESTS PASARON EXITOSAMENTE".
 
-### 2.2. `test_integration_basics.sh` (Ping entre Servicios)
-*   **Objetivo:** Confirmar que ambos microservicios (Go y Python) están activos y pueden comunicarse (o al menos coexistir).
-*   **Alcance:**
-    *   Verifica puerto 8080 (Go).
-    *   Verifica puerto 8000 (Python).
-    *   Verifica que Python puede leer la BD y generar un reporte básico.
-*   **Ejecución:** `./test_integration_basics.sh`
-*   **Señal de Éxito:** Tres checks verdes (✅) indicando "ONLINE".
-
-### 2.3. `test_scenarios.sh` (Prueba E2E de Alertas)
-*   **Objetivo:** Validar el motor de reglas de negocio y la detección de alertas en tiempo real.
-*   **Requisito:** El servidor Go debe iniciarse en modo escenario: `export SIMULATION_MODE=SCENARIO && go run ...`
+### 2.2. `test_logic_verification.py` (Cerebro Analítico)
+*   **Objetivo:** Validar que la matemática del negocio funciona.
 *   **Lógica:**
-    1.  Toma una muestra inicial (T=0).
-    2.  Espera 25 segundos mientras el simulador ejecuta su guion interno.
-    3.  Verifica que `CF-1` pasó de Crítico a Normal.
-    4.  Verifica que `CF-2` pasó de Normal a Crítico.
-    5.  Confirma que se generó un registro en la tabla `alerts`.
-*   **Señal de Éxito:** "✅ Alerta CF-1 Detectada".
+    1.  Limpia los datos de una cámara de prueba.
+    2.  Inyecta un escenario controlado (ej: 3 horas bien, 2 horas mal) directamente en MySQL.
+    3.  Consulta la API de Reportes.
+    4.  Verifica que `hours_at_risk` sea exactamente lo esperado (Matemática) y que `alert_causes` infiera la causa correcta (Lógica).
+*   **Importancia:** Garantiza que no estamos mostrando "números aleatorios".
 
-### 2.4. `test_analytics_integration.sh` (Cadena de Valor Completa)
-*   **Objetivo:** Validar la precisión matemática del módulo de Analítica.
-*   **Flujo Probado:**
-    1.  Ejecuta `scraper.py` -> Genera CSV de precios.
-    2.  Llama a la API de Análisis.
-    3.  Verifica que `estimated_cost` > 0 (usando los precios del CSV).
-*   **Interpretación de Resultados:**
-    *   Muestra el contexto (Inventario 200kg, Regla 4 horas).
-    *   Valida que el cálculo final tenga sentido financiero.
-*   **Señal de Éxito:** "✅ ÉXITO: El sistema calculó un costo financiero...".
+### 2.3. `test_config_persistence.py` (Integridad de Datos)
+*   **Objetivo:** Asegurar que los JSON complejos de configuración no se corrompen al guardarse en MySQL.
+*   **Flujo:**
+    1.  Envía una configuración compleja (canales anidados, roles específicos).
+    2.  Lee inmediatamente la configuración.
+    3.  Compara bit a bit la entrada y la salida.
+*   **Importancia:** Crucial para asegurar que las reglas de notificación se respeten.
+
+### 2.4. `test_analytics_scenarios.py` (Casos Borde y Performance)
+*   **Objetivo:** Probar la robustez del sistema ante situaciones extremas.
+*   **Escenarios:**
+    1.  **Downsampling:** Pide reporte de 3 días. Verifica que la respuesta sea rápida (uso de promedios horarios).
+    2.  **Escasez:** Pide reporte de 90 días con poca data. Verifica que el sistema no colapse y reporte baja confiabilidad.
+
+### 2.5. `test_validation_rules.py` (Escudo de Seguridad)
+*   **Objetivo:** Verificar que el Backend rechaza configuraciones físicamente imposibles.
+*   **Prueba:** Intenta guardar `Critical Cold > Critical Hot`.
+*   **Éxito:** Recibir un error `400 Bad Request`.
+
+### 2.6. `test_integration_basics.sh` (Ping)
+*   **Objetivo:** Diagnóstico rápido de "Vida". Verifica que los puertos 8080 y 8000 responden.
+
+### 2.7. `test_analytics_integration.sh` (Python Aislado)
+*   **Objetivo:** Probar el subsistema de Python (Scraper + API) sin pasar por Go. Útil para depurar errores internos de Analítica.
 
 ---
 
-## 3. Matriz de Errores Comunes
+## 3. Matriz de Solución de Problemas
 
-| Síntoma | Causa Probable | Solución |
-| :--- | :--- | :--- |
-| **Connection Refused (8080)** | El servidor Go no está corriendo. | Ejecutar `go run cmd/server/main.go`. |
-| **Connection Refused (8000)** | El servidor Python no está corriendo. | Ejecutar `uvicorn main:app` en `analytics/`. |
-| **Error: Unsupported operand type** | Python viejo en memoria. | Reiniciar `uvicorn` tras cambios de código. |
-| **Costo Estimado = 0** | No hubo alertas en los últimos 30 min. | Ejecutar primero una prueba que genere alertas (Escenario) o esperar. |
-| **Database connection failed** | Credenciales incorrectas en `.env`. | Revisar usuario/password de MySQL. |
+| Síntoma | Test Fallido | Causa Probable | Solución |
+| :--- | :--- | :--- | :--- |
+| **JSON Error / Estructura** | `test_full_integration_suite` | Cambio en `models.go` no reflejado en JSON tags. | Revisar nombres de campos JSON. |
+| **Cálculo de Riesgo Erróneo** | `test_logic_verification` | Desfase de Zona Horaria (UTC vs Local) o bug en query SQL. | Revisar `analysis.py` y configuración de servidor MySQL. |
+| **Error 500 en Reportes** | `test_analytics_scenarios` | Fallo en formato de fecha o librería Pandas. | Revisar logs de Python (`uvicorn`). |
+| **Configuración "Zombie"** | `test_config_persistence` | Error en serialización JSON en `sensor_service.go` o `config.go`. | Verificar `json.Marshal/Unmarshal`. |
 
 ---
 
-## 4. Flujo de Trabajo Recomendado para Desarrollo
+## 4. Ejecución Recomendada
+Para una validación completa del sistema, ejecute:
 
-1.  Hacer cambios en el código (Go o Python).
-2.  Reiniciar el servicio correspondiente.
-3.  Ejecutar `test_integration_basics.sh` para verificar que levanta.
-4.  Si tocaste lógica de negocio, ejecutar `test_analytics_integration.sh`.
+```bash
+cd rukito-backend/tests
+./test_full_integration_suite.sh
+# Si pasa, proceda con las pruebas lógicas específicas según necesidad.
+```

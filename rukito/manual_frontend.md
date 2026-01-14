@@ -38,6 +38,7 @@ El centro de mando que ofrece una visión panorámica del estado de todas las c�
     "rate_of_change": 0.5,
     "status": "WARNING_HOT", // ENUM: NORMAL, WARNING_HOT, CRITICAL_HOT, CRITICAL_COLD, OFFLINE
     "last_update": "2024-12-11T22:15:00Z",
+    "recent_temperatures": [-16.0, -16.2, -16.5, -16.4], // Lista de floats para sparklines
     "is_active": true
   }
 ]
@@ -155,8 +156,9 @@ Panel de control para definir las reglas de negocio y seguridad de cada equipo.
 *   **Umbrales Granulares:** Definición precisa de 4 niveles:
     1.  🥶 Crítico Frío (Congelación excesiva)
     2.  🎯 Objetivo (Ideal)
-    3.  ⚠️ Advertencia (Pre-alarma)
+    3.  ⚠️ Temperatura Advertencia (Pre-alarma)
     4.  🔥 Crítico Calor (Peligro)
+*   **Ayuda Contextual:** Botón de información (Tooltip) explicativo en el parámetro de Sensibilidad.
 *   **Reglas de Notificación:** Configuración de canales (Push, Email, SMS) separada por escenario de riesgo.
 
 ### 🔗 Integración API
@@ -219,4 +221,23 @@ Gestión de datos de contacto para la recepción de alertas.
   "role": "admin",
   "avatar_url": null
 }
+
+---
+
+## ⚠️ Estado de Implementación y Deuda Técnica (Prototipo V2)
+
+Esta sección detalla discrepancias conocidas entre el diseño y la implementación actual del prototipo.
+
+### 1. Gestión de Avatar de Usuario
+*   **Estado:** Implementación Estática.
+*   **Detalle:** Aunque el modelo `UserProfile` y la API incluyen el campo `avatar_url`, la interfaz de usuario ignora este valor y carga el archivo local `assets/images/bello.png` de forma persistente.
+*   **Motivo:** Evitar la modificación del esquema de base de datos actual y garantizar una visualización personalizada inmediata en el prototipo.
+
+### 2. Persistencia de Sesión
+*   **Estado:** No Implementada.
+*   **Detalle:** El sistema asume un perfil de administrador constante (ID: USR-001). No existe flujo de Login ni almacenamiento de tokens JWT en esta versión.
+
+### 3. Conectividad en Tiempo Real
+*   **Estado:** Simulación por Polling.
+*   **Detalle:** El frontend solicita actualizaciones periódicas. No se han implementado WebSockets para notificaciones instantáneas ("Push Real").
 ```

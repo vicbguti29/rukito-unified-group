@@ -39,18 +39,21 @@ graph TD
 
 Para entender cómo funciona el sistema en conjunto, sigamos el rastro de una lectura de temperatura:
 
-1.  **Generación:** Una Goroutine en Go genera una temperatura de `-16°C` para la cámara `CF-1`.
+1.  **Generación:** Una Goroutine en Go genera una temperatura de `-9°C` para la cámara `CF-1`.
 2.  **Tránsito Interno:** El dato viaja por un canal seguro hasta el `Worker Pool`.
-3.  **Cálculo Instantáneo:** Go nota que la temperatura anterior era `-20°C`. Calcula instantáneamente un $dT/dt$ positivo alto.
+3.  **Evaluación Granular:** 
+    *   Go consulta su caché de configuración (`alert_configs`).
+    *   Detecta que `-9°C` es mayor que el *Umbral Crítico Calor* (`-10°C`).
+    *   Asigna el estado `CRITICAL_HOT`.
 4.  **Persistencia y Alerta:** 
-    *   Go guarda la lectura en MySQL. 
-    *   Como `-16°C` supera el umbral, Go crea una Alerta Crítica en la tabla `alerts`.
+    *   Go guarda la lectura en MySQL con el status calculado.
+    *   Genera una Alerta con severidad `CRITICAL` y categoría `HOT_TEMP` en la tabla `alerts`.
 5.  **Solicitud de Análisis:** El usuario abre la App y pide un reporte. El Backend Go recibe la petición y llama al Servicio de Python.
 6.  **Procesamiento Profundo:** 
-    *   Python lee el historial de MySQL (donde Go ha estado escribiendo).
-    *   Python lee los precios de mercado del CSV.
-    *   Aplica la **Regla de las 4 horas** y calcula que esos `-16°C` representan un riesgo de **$1,200 USD**.
-7.  **Entrega:** El JSON con el costo calculado viaja de Python a Go, y de Go a la App Flutter.
+    *   Python lee el historial de MySQL (aplicando *downsampling* si el rango es > 24h).
+    *   Calcula el tiempo acumulado en zona de peligro (`hours_at_risk`).
+    *   Infiere la causa probable (ej: "Puerta Abierta") basándose en la frecuencia de alertas `HOT_TEMP`.
+7.  **Entrega:** El JSON con el costo financiero y el diagnóstico viaja de Python a Go, y de Go a la App Flutter.
 
 ---
 

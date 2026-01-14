@@ -8,12 +8,10 @@ Proyecto universitario para el monitoreo concurrente en tiempo real de cámaras 
 
 El proyecto sigue una arquitectura de microservicios híbrida:
 
-1.  **Frontend (Flutter):** Dashboard móvil para visualización y control.
+1.  **Frontend (Flutter):** Dashboard móvil multiplataforma para visualización y control.
 2.  **Backend Core (Go):** API Gateway de alto rendimiento, gestión de concurrencia (Goroutines) y persistencia.
-3.  **Analytics Service (Python):** Motor de inteligencia de negocio, cálculo de $dT/dt$ y estimación de costos basada en scraping de mercado.
-4.  **Base de Datos (MySQL):** Almacenamiento centralizado.
-
----
+3.  **Analytics Service (Python):** Motor de inteligencia de negocio, cálculo de riesgo térmico y estimación de costos basada en scraping de mercado.
+4.  **Base de Datos (MySQL):** Almacenamiento centralizado con esquema granular.
 
 ---
 
@@ -25,11 +23,9 @@ El proyecto sigue una arquitectura de microservicios híbrida:
 ├── rukito-backend/          # Backend Monorepo
 │   ├── cmd/server/          # Entrypoint Go
 │   ├── internal/            # Código fuente Go (API, DB, Modelos)
-│   ├── analytics/           # Microservicio Python
-│   │   ├── analysis.py      # Lógica de negocio (FDA Rule, dT/dt)
-│   │   ├── scraper.py       # Extracción de precios de mercado
-│   │   └── main.py          # API FastAPI
-│   └── scripts/             # SQL de inicialización
+│   ├── analytics/           # Microservicio Python (FastAPI)
+│   ├── scripts/             # SQL de inicialización y Seeding
+│   └── tests/               # Suite de pruebas de integración
 └── datos/                   # CSVs compartidos (precios, logs)
 ```
 
@@ -39,10 +35,11 @@ El proyecto sigue una arquitectura de microservicios híbrida:
 
 Aplicación móvil para el usuario final (Responsabilidad: Víctor Borbor).
 
-### Características
-*   **Dashboard en Tiempo Real**: Visualización actualizada de todas las cámaras.
-*   **Centro de Alertas**: Sistema de prioridades (P1, P2, P3).
-*   **Histórico y Reportes**: Gráficos de tendencias y KPIs financieros.
+### Características Clave
+*   **Dashboard Granular**: Visualización en tiempo real con Sparklines (mini-gráficos de tendencia).
+*   **Configuración Avanzada**: Gestión de 4 umbrales térmicos (Frío, Objetivo, Advertencia, Calor) con validaciones de seguridad.
+*   **Centro de Alertas**: Clasificación por severidad (Crítico vs Advertencia) e iconos semánticos.
+*   **Reportes Inteligentes**: Análisis de confiabilidad, costos y diagnósticos automáticos.
 
 ### Instalación
 ```bash
@@ -54,9 +51,11 @@ flutter run
 ### Configuración API
 Para conectar con el backend real, editar `lib/services/api_service.dart`:
 ```dart
+// Para Android Emulator use 10.0.2.2, para Web/Desktop use localhost
 static const String _baseUrl = 'http://localhost:8080/api';
 ```
 
+---
 
 ## 🚀 Guía de Inicio Rápido (Backend & Analytics)
 
@@ -70,13 +69,12 @@ Para levantar toda la infraestructura del servidor (Responsabilidad: Angello Vá
 ### 2. Configuración de Base de Datos
 Ejecuta el script SQL para crear la base de datos y cargar datos iniciales:
 ```bash
-# Desde la raíz del repositorio
-mysql -u root -p < rukito-backend/scripts/setup.sql
+# Desde la raíz del repositorio backend
+mysql -u root -p < scripts/setup.sql
 ```
 
 ### 3. Configuración del Entorno
-Asegúrate de crear un archivo `.env` en `rukito-backend/` basándote en el ejemplo.
-Define tus credenciales locales:
+Crea un archivo `.env` en `rukito-backend/`. Ejemplo de estructura final:
 
 ```env
 # Base de datos
@@ -89,9 +87,6 @@ DB_NAME=rukito
 # Servidor Go
 SERVER_PORT=8080
 SERVER_HOST=0.0.0.0
-
-# Modos de Simulación: RANDOM (Producción) | SCENARIO (Testing)
-SIMULATION_MODE=RANDOM
 
 # Python Analytics Service
 PYTHON_SERVICE_URL=http://localhost:8000
@@ -111,9 +106,6 @@ go mod tidy
 # - github.com/joho/godotenv (v1.5.1)
 # - github.com/google/uuid (v1.6.0)
 
-# Antes de ejecutar, verificar el modo de ejecución del servidor en el archivo .env: 
-# SIMULATION_MODE=RANDOM (producción) por defecto
-# SIMULATION_MODE=SCENARIO (testing)
 go run cmd/server/main.go
 ```
 *El servidor escuchará en `http://localhost:8080`.*
@@ -138,40 +130,35 @@ uvicorn main:app --port 8000 --reload
 
 ---
 
-## 🧪 Ejecución de Pruebas (Test Suite)
+## 🧪 Ejecución de Pruebas (Test Suite Backend)
 
-Hemos preparado una suite de scripts automatizados para verificar la integración de todos los componentes.
+La suite de pruebas automatizadas verifica la integridad lógica y la comunicación entre servicios.
+
+**Nota:** Estos tests validan únicamente el Backend (Go + Python).
 
 **Instrucciones:**
-1.  Asegúrate de tener **ambos servidores corriendo** (Go en 8080, Python en 8000).
-2.  Ejecuta los siguientes comandos desde la carpeta `rukito-backend/`:
+1.  Asegúrate de que **MySQL, Go (8080) y Python (8000)** estén corriendo.
+2.  Los scripts se encuentran en la carpeta `rukito-backend/tests/`.
+3.  Ejecuta el script maestro o los tests individuales según necesites:
 
 ```bash
 cd rukito-backend
 
-# 1. Verificar Endpoints Básicos (CRUD)
-./test_endpoints.sh
-
-# 2. Verificar Integración Go <-> Python (Ping)
-./test_integration_basics.sh
-
-# 3. Verificar Simulación de Escenarios (Requiere reiniciar Go con SIMULATION_MODE=SCENARIO)
-# ./test_scenarios.sh
-
-# 4. Verificar Cadena de Valor Completa (Scraping -> Análisis -> Reporte Financiero)
-./test_analytics_integration.sh
+# Ejecutar suite completa de integración
+./tests/test_full_integration_suite.sh
 ```
 
 ---
 
 ## 📚 Manuales y Documentación
 
-Hemos preparado una serie de manuales detallados de cómo funcionan los servicios del backend de forma independiente y cómo trabajan en conjunto.
+Documentación técnica detallada para desarrolladores e integradores.
 
-*   **[Manual del Backend (Go)](rukito-backend/docs/MANUAL_BACKEND_GO.md):** Guía completa sobre la API, endpoints y estructura del servidor en Go.
-*   **[Manual de Analítica (Python)](rukito-backend/docs/MANUAL_ANALYTICS_PYTHON.md):** Detalles sobre el microservicio de análisis financiero y algoritmos.
-*   **[Manual de Pruebas](rukito-backend/docs/MANUAL_TESTS.md):** Guía para ejecutar y entender la suite de tests automatizados.
-*   **[Arquitectura del Sistema](rukito-backend/docs/SYSTEM_ARCHITECTURE.md):** Visión general técnica y diagramas de la solución.
+*   **[Manual del Frontend (Flutter)](rukito/manual_frontend.md):** Guía de pantallas, modelos y consumo de API.
+*   **[Manual del Backend (Go)](rukito-backend/docs/MANUAL_BACKEND_GO.md):** API, endpoints granulares y arquitectura.
+*   **[Manual de Analítica (Python)](rukito-backend/docs/MANUAL_ANALYTICS_PYTHON.md):** Algoritmos financieros y de riesgo.
+*   **[Manual de Tests](rukito-backend/docs/MANUAL_TESTS.md):** Guía detallada de la suite de pruebas del servidor (Backend y Analítica).
+*   **[Arquitectura del Sistema](rukito-backend/docs/SYSTEM_ARCHITECTURE.md):** Diagramas de flujo y ciclo de vida del dato.
 
 ---
 
