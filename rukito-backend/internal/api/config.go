@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -17,26 +16,34 @@ func GetAlertConfig(w http.ResponseWriter, r *http.Request) {
 	sensorID := vars["id"]
 
 	query := `
-		SELECT id, sensor_id, max_temperature, min_temperature, rate_of_change_threshold, priority, is_enabled, notification_channels, recipients, created_at, updated_at 
+		SELECT sensor_id, threshold_critical_cold, threshold_target, threshold_warning_hot, threshold_critical_hot, 
+		       rate_of_change_threshold, actions_warning_hot, actions_critical_hot, actions_critical_cold, 
+		       is_enabled, updated_at 
 		FROM alert_configs 
 		WHERE sensor_id = ?`
 
 	row := db.DB.QueryRow(query, sensorID)
 
 	var c models.AlertConfig
-	var channelsJSON, recipientsJSON []byte
+	var warningHotJSON, criticalHotJSON, criticalColdJSON []byte
 
-	err := row.Scan(&c.ID, &c.SensorID, &c.MaxTemp, &c.MinTemp, &c.RateOfChangeThreshold, &c.Priority, &c.IsEnabled, &channelsJSON, &recipientsJSON, &c.CreatedAt, &c.UpdatedAt)
+	err := row.Scan(
+		&c.SensorID, 
+		&c.Thresholds.CriticalCold, &c.Thresholds.Target, &c.Thresholds.WarningHot, &c.Thresholds.CriticalHot,
+		&c.Thresholds.RateOfChange,
+		&warningHotJSON, &criticalHotJSON, &criticalColdJSON,
+		&c.IsEnabled, &c.UpdatedAt,
+	)
+
 	if err != nil {
-		// If not found, return a default config or 404. Ideally we should create a default one.
-		// For now returning 404 to be safe.
 		http.Error(w, "Configuration not found", http.StatusNotFound)
 		return
 	}
 
 	// Parse JSON fields
-	json.Unmarshal(channelsJSON, &c.NotificationChannels)
-	json.Unmarshal(recipientsJSON, &c.Recipients)
+	json.Unmarshal(warningHotJSON, &c.Notifications.OnWarningHot)
+	json.Unmarshal(criticalHotJSON, &c.Notifications.OnCriticalHot)
+	json.Unmarshal(criticalColdJSON, &c.Notifications.OnCriticalCold)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(c)
@@ -53,40 +60,46 @@ func UpdateAlertConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Marshall JSON fields for DB
-	channelsJSON, _ := json.Marshal(c.NotificationChannels)
-	recipientsJSON, _ := json.Marshal(c.Recipients)
+	// VALIDACIÓN DE NEGOCIO: Coherencia Térmica
+	// Orden esperado: Critical Cold < Target < Warning Hot < Critical Hot
+	t := c.Thresholds
+	if t.CriticalCold >= t.Target {
+		http.Error(w, "Invalid Configuration: Critical Cold must be lower than Target", http.StatusBadRequest)
+		return
+	}
+	if t.Target >= t.WarningHot {
+		http.Error(w, "Invalid Configuration: Target must be lower than Warning threshold", http.StatusBadRequest)
+		return
+	}
+	if t.WarningHot >= t.CriticalHot {
+		http.Error(w, "Invalid Configuration: Warning threshold must be lower than Critical Hot", http.StatusBadRequest)
+		return
+	}
+
+	// Marshal JSON fields for DB
+	warningHotJSON, _ := json.Marshal(c.Notifications.OnWarningHot)
+	criticalHotJSON, _ := json.Marshal(c.Notifications.OnCriticalHot)
+	criticalColdJSON, _ := json.Marshal(c.Notifications.OnCriticalCold)
 
 	query := `
 		UPDATE alert_configs 
-		SET max_temperature=?, min_temperature=?, rate_of_change_threshold=?, priority=?, is_enabled=?, notification_channels=?, recipients=?, updated_at=NOW() 
+		SET threshold_critical_cold=?, threshold_target=?, threshold_warning_hot=?, threshold_critical_hot=?, 
+		    rate_of_change_threshold=?, actions_warning_hot=?, actions_critical_hot=?, actions_critical_cold=?, 
+		    is_enabled=?, updated_at=NOW() 
 		WHERE sensor_id=?`
 
-	_, err := db.DB.Exec(query, c.MaxTemp, c.MinTemp, c.RateOfChangeThreshold, c.Priority, c.IsEnabled, channelsJSON, recipientsJSON, sensorID)
+	_, err := db.DB.Exec(query, 
+		c.Thresholds.CriticalCold, c.Thresholds.Target, c.Thresholds.WarningHot, c.Thresholds.CriticalHot,
+		c.Thresholds.RateOfChange,
+		warningHotJSON, criticalHotJSON, criticalColdJSON,
+		c.IsEnabled, sensorID)
+	
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// SINCRONIZACIÓN: Actualizar también los umbrales visuales en la tabla 'chambers'
-	// Asumimos lógica por defecto: Advertencia es 2 grados antes del crítico
-	updateChamberQuery := `
-		UPDATE chambers 
-		SET critical_threshold = ?, warning_threshold = ? 
-		WHERE id = ?`
-	
-	// Warning threshold = MaxTemp - 2.0 (ej: si Max es -18, Warning es -20)
-	// Nota: Para cámaras de frío, "más caliente" es peor, así que warning debe ser MENOR que critical
-	warningThreshold := c.MaxTemp - 2.0
-	
-	_, err = db.DB.Exec(updateChamberQuery, c.MaxTemp, warningThreshold, sensorID)
-	if err != nil {
-		// Logueamos el error pero no fallamos la request principal
-		fmt.Printf("Warning: Failed to sync chamber thresholds: %v\n", err)
-	}
-
-	// Return updated config (fetching it again to be sure)
-	// For simplicity, we just return what we received + updated timestamp
+	// Return updated config
 	c.SensorID = sensorID
 	c.UpdatedAt = time.Now()
 	

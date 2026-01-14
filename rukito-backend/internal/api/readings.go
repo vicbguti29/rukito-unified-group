@@ -25,11 +25,16 @@ func GetReadings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Unimos con alert_configs para obtener el target_temperature histórico (aproximado, usando el actual)
+	// En un sistema ideal, el target debería guardarse en cada lectura si cambia mucho, 
+	// pero para este MVP usamos el actual de la configuración.
 	query := `
-		SELECT id, sensor_id, temperature, rate_of_change, status, timestamp 
-		FROM temperature_readings 
-		WHERE sensor_id = ? 
-		ORDER BY timestamp DESC 
+		SELECT tr.id, tr.sensor_id, tr.temperature, tr.rate_of_change, tr.status, tr.timestamp,
+		       COALESCE(ac.threshold_target, 0)
+		FROM temperature_readings tr
+		LEFT JOIN alert_configs ac ON tr.sensor_id = ac.sensor_id
+		WHERE tr.sensor_id = ? 
+		ORDER BY tr.timestamp DESC 
 		LIMIT ?`
 
 	rows, err := db.DB.Query(query, sensorID, limit)
@@ -42,16 +47,26 @@ func GetReadings(w http.ResponseWriter, r *http.Request) {
 	readings := []models.TemperatureReading{}
 	for rows.Next() {
 		var tr models.TemperatureReading
-		// Note: The struct has TargetTemp, MinTemp, MaxTemp which are not in the readings table
-		// based on the SQL script. We might need to join with chambers table or leave them 0/null
-		// For now, we will fill what we have in the DB.
-		// The API Spec response shows them. Ideally, we JOIN chambers to get targets.
-		
-		err := rows.Scan(&tr.ID, &tr.SensorID, &tr.Temperature, &tr.RateOfChange, &tr.Status, &tr.Timestamp)
+		var timestampBytes []byte 
+
+		// Scan into temporary bytes for timestamp just in case
+		err := rows.Scan(&tr.ID, &tr.SensorID, &tr.Temperature, &tr.RateOfChange, &tr.Status, &timestampBytes, &tr.TargetTemperature)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		if len(timestampBytes) > 0 {
+			// Try parsing standard MySQL format
+			t, err := time.Parse("2006-01-02 15:04:05", string(timestampBytes))
+			if err == nil {
+				tr.Timestamp = t
+			} else {
+				// Fallback or try RFC3339 if stored differently
+				tr.Timestamp, _ = time.Parse(time.RFC3339, string(timestampBytes))
+			}
+		}
+
 		readings = append(readings, tr)
 	}
 
@@ -73,9 +88,18 @@ func GetReadingHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate time format (RFC3339 matches ISO8601 for this purpose)
-	_, errStart := time.Parse(time.RFC3339, startStr)
-	_, errEnd := time.Parse(time.RFC3339, endStr)
+	// Validate time format
+	// El frontend envía ISO8601 (2024-01-01T00:00:00Z)
+	startParams, errStart := time.Parse(time.RFC3339, startStr)
+	endParams, errEnd := time.Parse(time.RFC3339, endStr)
+
+	// Si falla, probar formato simple sin Z
+	if errStart != nil {
+		startParams, errStart = time.Parse("2006-01-02T15:04:05", startStr)
+	}
+	if errEnd != nil {
+		endParams, errEnd = time.Parse("2006-01-02T15:04:05", endStr)
+	}
 
 	if errStart != nil || errEnd != nil {
 		http.Error(w, "Invalid date format. Use ISO8601 (e.g. 2024-12-01T00:00:00Z)", http.StatusBadRequest)
@@ -83,12 +107,15 @@ func GetReadingHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := `
-		SELECT id, sensor_id, temperature, rate_of_change, status, timestamp 
-		FROM temperature_readings 
-		WHERE sensor_id = ? AND timestamp BETWEEN ? AND ?
-		ORDER BY timestamp ASC`
+		SELECT tr.id, tr.sensor_id, tr.temperature, tr.rate_of_change, tr.status, tr.timestamp,
+		       COALESCE(ac.threshold_target, 0)
+		FROM temperature_readings tr
+		LEFT JOIN alert_configs ac ON tr.sensor_id = ac.sensor_id
+		WHERE tr.sensor_id = ? AND tr.timestamp BETWEEN ? AND ?
+		ORDER BY tr.timestamp ASC`
 
-	rows, err := db.DB.Query(query, sensorID, startStr, endStr)
+	// MySQL driver accepts time.Time objects
+	rows, err := db.DB.Query(query, sensorID, startParams, endParams)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -98,11 +125,23 @@ func GetReadingHistory(w http.ResponseWriter, r *http.Request) {
 	readings := []models.TemperatureReading{}
 	for rows.Next() {
 		var tr models.TemperatureReading
-		err := rows.Scan(&tr.ID, &tr.SensorID, &tr.Temperature, &tr.RateOfChange, &tr.Status, &tr.Timestamp)
+		var timestampBytes []byte
+
+		err := rows.Scan(&tr.ID, &tr.SensorID, &tr.Temperature, &tr.RateOfChange, &tr.Status, &timestampBytes, &tr.TargetTemperature)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		if len(timestampBytes) > 0 {
+			t, err := time.Parse("2006-01-02 15:04:05", string(timestampBytes))
+			if err == nil {
+				tr.Timestamp = t
+			} else {
+				tr.Timestamp, _ = time.Parse(time.RFC3339, string(timestampBytes))
+			}
+		}
+
 		readings = append(readings, tr)
 	}
 

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/angello/rukito-backend/internal/db"
@@ -13,29 +12,16 @@ import (
 )
 
 // GetAlerts returns all alerts with optional filtering
-// Query Params: limit, unread_only (bool)
 func GetAlerts(w http.ResponseWriter, r *http.Request) {
-	limitStr := r.URL.Query().Get("limit")
-	unreadOnlyStr := r.URL.Query().Get("unread_only")
+	// Query params handling could be added here (limit, severity, etc.)
+	
+	query := `
+		SELECT id, title, COALESCE(description, ''), severity, category, sensor_id, is_read, estimated_cost, channels, timestamp 
+		FROM alerts 
+		ORDER BY timestamp DESC 
+		LIMIT 50`
 
-	limit := 50
-	if limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
-			limit = l
-		}
-	}
-
-	query := `SELECT id, title, description, priority, type, sensor_id, is_read, estimated_cost, timestamp FROM alerts`
-	var args []interface{}
-
-	if unreadOnlyStr == "true" {
-		query += ` WHERE is_read = FALSE`
-	}
-
-	query += ` ORDER BY timestamp DESC LIMIT ?`
-	args = append(args, limit)
-
-	rows, err := db.DB.Query(query, args...)
+	rows, err := db.DB.Query(query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -45,18 +31,25 @@ func GetAlerts(w http.ResponseWriter, r *http.Request) {
 	var alerts []models.Alert
 	for rows.Next() {
 		var a models.Alert
-		// Handling nullable EstimatedCost
 		var estCost sql.NullFloat64
-		
-		err := rows.Scan(&a.ID, &a.Title, &a.Description, &a.Priority, &a.Type, &a.SensorID, &a.IsRead, &estCost, &a.Timestamp)
+		var channelsJSON []byte
+
+		// "El Cuidado Especial": Leemos channels como []byte (channelsJSON)
+		err := rows.Scan(&a.ID, &a.Title, &a.Description, &a.Severity, &a.Category, &a.SensorID, &a.IsRead, &estCost, &channelsJSON, &a.Timestamp)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if estCost.Valid {
-			val := estCost.Float64
-			a.EstimatedCost = &val
+			a.EstimatedCost = estCost.Float64
+		}
+
+		// Deserializamos: De Bytes a []string
+		if len(channelsJSON) > 0 {
+			json.Unmarshal(channelsJSON, &a.Channels)
+		} else {
+			a.Channels = []string{} // Evitar null en el JSON de respuesta
 		}
 
 		alerts = append(alerts, a)
@@ -72,7 +65,7 @@ func GetChamberAlerts(w http.ResponseWriter, r *http.Request) {
 	sensorID := vars["id"]
 
 	query := `
-		SELECT id, title, description, priority, type, sensor_id, is_read, estimated_cost, timestamp 
+		SELECT id, title, COALESCE(description, ''), severity, category, sensor_id, is_read, estimated_cost, channels, timestamp 
 		FROM alerts 
 		WHERE sensor_id = ? 
 		ORDER BY timestamp DESC 
@@ -89,16 +82,22 @@ func GetChamberAlerts(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var a models.Alert
 		var estCost sql.NullFloat64
+		var channelsJSON []byte
 
-		err := rows.Scan(&a.ID, &a.Title, &a.Description, &a.Priority, &a.Type, &a.SensorID, &a.IsRead, &estCost, &a.Timestamp)
+		err := rows.Scan(&a.ID, &a.Title, &a.Description, &a.Severity, &a.Category, &a.SensorID, &a.IsRead, &estCost, &channelsJSON, &a.Timestamp)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if estCost.Valid {
-			val := estCost.Float64
-			a.EstimatedCost = &val
+			a.EstimatedCost = estCost.Float64
+		}
+
+		if len(channelsJSON) > 0 {
+			json.Unmarshal(channelsJSON, &a.Channels)
+		} else {
+			a.Channels = []string{}
 		}
 
 		alerts = append(alerts, a)
@@ -120,10 +119,11 @@ func MarkAlertRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Retornamos el objeto actualizado (mockeado parcialmente para rapidez)
 	response := map[string]interface{}{
 		"id":         alertID,
 		"is_read":    true,
-		"updated_at": time.Now().Format(time.RFC3339),
+		"updated_at": time.Now(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

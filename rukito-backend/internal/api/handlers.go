@@ -4,15 +4,36 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/angello/rukito-backend/internal/db"
 	"github.com/angello/rukito-backend/internal/models"
 	"github.com/gorilla/mux"
 )
 
-// GetChambers returns all cold chambers from the database
+// GetChambers returns all cold chambers with real-time data
 func GetChambers(w http.ResponseWriter, r *http.Request) {
-	query := `SELECT id, name, content, target_temperature, critical_threshold, warning_threshold, location, is_active, updated_at FROM chambers`
+	// Query compleja para unir metadata (chambers), configuración (target) y estado real (última lectura)
+	query := `
+		SELECT c.id, c.name, c.content_description, c.location, c.model, c.is_active, c.updated_at,
+		       COALESCE(ac.threshold_target, 0) as target,
+		       COALESCE(tr.temperature, 0) as current_temp,
+		       COALESCE(tr.rate_of_change, 0) as rate,
+		       COALESCE(tr.status, 'NORMAL') as status,
+		       COALESCE(tr.timestamp, c.updated_at) as last_update
+		FROM chambers c
+		LEFT JOIN alert_configs ac ON c.id = ac.sensor_id
+		LEFT JOIN (
+			SELECT t1.sensor_id, t1.temperature, t1.rate_of_change, t1.status, t1.timestamp
+			FROM temperature_readings t1
+			JOIN (
+				SELECT sensor_id, MAX(id) as max_id
+				FROM temperature_readings
+				GROUP BY sensor_id
+			) t2 ON t1.sensor_id = t2.sensor_id AND t1.id = t2.max_id
+		) tr ON c.id = tr.sensor_id
+	`
+	
 	rows, err := db.DB.Query(query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -23,17 +44,61 @@ func GetChambers(w http.ResponseWriter, r *http.Request) {
 	var chambers []models.ColdChamber
 	for rows.Next() {
 		var c models.ColdChamber
-		err := rows.Scan(&c.ID, &c.Name, &c.Content, &c.TargetTemperature, &c.CriticalThreshold, &c.WarningThreshold, &c.Location, &c.IsActive, &c.LastUpdate)
+		var contentDesc sql.NullString
+		var model sql.NullString
+		var lastUpdateStr string // Scan as string/bytes or Time depending on driver
+
+		// Scan
+		err := rows.Scan(
+			&c.ID, &c.Name, &contentDesc, &c.Location, &model, &c.IsActive, &c.LastUpdate, // updated_at from chambers (fallback)
+			&c.TargetTemperature,
+			&c.CurrentTemperature,
+			&c.RateOfChange,
+			&c.Status,
+			&lastUpdateStr, // timestamp from reading
+		)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		// En un sistema real, aquí buscaríamos la temperatura actual y lecturas recientes
-		// Por ahora simularemos datos básicos o dejaremos valores por defecto
-		c.CurrentTemperature = c.TargetTemperature // Placeholder
-		c.Status = 0 // Online
-		c.RecentTemps = []float64{c.TargetTemperature, c.TargetTemperature}
+		// Handle Nullables
+		if contentDesc.Valid { c.Content = contentDesc.String }
+		if model.Valid { c.Model = model.String }
+		
+		// Parse timestamp from DB (MySQL driver might return []byte or string)
+		// Assuming the driver handles it or we parse string. 
+		// For simplicity, if the driver scans into Time, we use that. 
+		// If it scans into string, we parse.
+		// Note: We scanned into 'lastUpdateStr' (string) for the reading timestamp.
+		// Let's parse it if not empty
+		if lastUpdateStr != "" {
+			// Try parsing typical MySQL format
+			parsedTime, err := time.Parse("2006-01-02 15:04:05", lastUpdateStr)
+			if err == nil {
+				c.LastUpdate = parsedTime
+			}
+		}
+
+		// SUBQUERY: Obtener ultimas 20 lecturas para el sparkline (grafico pequeño)
+		// Nota: Esto es N+1 queries, pero para 3 camaras es despreciable.
+		// En produccion usariamos un JOIN complejo o una tabla cacheada.
+		recentRows, err := db.DB.Query("SELECT temperature FROM temperature_readings WHERE sensor_id = ? ORDER BY timestamp DESC LIMIT 20", c.ID)
+		if err == nil {
+			var temps []float64
+			for recentRows.Next() {
+				var t float64
+				if err := recentRows.Scan(&t); err == nil {
+					temps = append(temps, t)
+				}
+			}
+			recentRows.Close()
+			// Invertir para orden cronologico (izquierda a derecha en el grafico)
+			for i, j := 0, len(temps)-1; i < j; i, j = i+1, j-1 {
+				temps[i], temps[j] = temps[j], temps[i]
+			}
+			c.RecentTemps = temps
+		}
 
 		chambers = append(chambers, c)
 	}
@@ -47,11 +112,39 @@ func GetChamber(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	query := `SELECT id, name, content, target_temperature, critical_threshold, warning_threshold, location, is_active, updated_at FROM chambers WHERE id = ?`
-	row := db.DB.QueryRow(query, id)
+	query := `
+		SELECT c.id, c.name, c.content_description, c.location, c.model, c.is_active, c.updated_at,
+		       COALESCE(ac.threshold_target, 0) as target,
+		       COALESCE(tr.temperature, 0) as current_temp,
+		       COALESCE(tr.rate_of_change, 0) as rate,
+		       COALESCE(tr.status, 'NORMAL') as status,
+		       COALESCE(tr.timestamp, c.updated_at) as last_update
+		FROM chambers c
+		LEFT JOIN alert_configs ac ON c.id = ac.sensor_id
+		LEFT JOIN (
+			SELECT sensor_id, temperature, rate_of_change, status, timestamp
+			FROM temperature_readings
+			WHERE sensor_id = ?
+			ORDER BY id DESC LIMIT 1
+		) tr ON c.id = tr.sensor_id
+		WHERE c.id = ?
+	`
+	
+	row := db.DB.QueryRow(query, id, id)
 
 	var c models.ColdChamber
-	err := row.Scan(&c.ID, &c.Name, &c.Content, &c.TargetTemperature, &c.CriticalThreshold, &c.WarningThreshold, &c.Location, &c.IsActive, &c.LastUpdate)
+	var contentDesc sql.NullString
+	var model sql.NullString
+	var lastUpdateRaw []byte // Scanning into bytes to be safe
+
+	err := row.Scan(
+		&c.ID, &c.Name, &contentDesc, &c.Location, &model, &c.IsActive, &c.LastUpdate,
+		&c.TargetTemperature,
+		&c.CurrentTemperature,
+		&c.RateOfChange,
+		&c.Status,
+		&lastUpdateRaw,
+	)
 	
 	if err == sql.ErrNoRows {
 		http.Error(w, "Chamber not found", http.StatusNotFound)
@@ -61,10 +154,18 @@ func GetChamber(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Simulando datos dinámicos por ahora
-	c.CurrentTemperature = c.TargetTemperature
-	c.Status = 0
-	c.RecentTemps = []float64{c.TargetTemperature, c.TargetTemperature}
+	if contentDesc.Valid { c.Content = contentDesc.String }
+	if model.Valid { c.Model = model.String }
+	
+	if len(lastUpdateRaw) > 0 {
+		// Attempt to parse standard MySQL time format
+		// "2006-01-02 15:04:05"
+		strVal := string(lastUpdateRaw)
+		t, err := time.Parse("2006-01-02 15:04:05", strVal)
+		if err == nil {
+			c.LastUpdate = t
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(c)
@@ -75,6 +176,41 @@ func GetHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":    "ok",
-		"timestamp": "2024-12-11T22:30:00Z", // Placeholder
+		"timestamp": time.Now().Format(time.RFC3339),
 	})
+}
+
+// GetUserProfile returns the profile of the current user (Hardcoded to Don Jorge for now)
+func GetUserProfile(w http.ResponseWriter, r *http.Request) {
+	query := `SELECT id, full_name, email, phone_number, role FROM users LIMIT 1`
+	row := db.DB.QueryRow(query)
+
+	var u models.User
+	err := row.Scan(&u.ID, &u.Name, &u.Email, &u.PhoneNumber, &u.Role)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(u)
+}
+
+// UpdateUserProfile updates user data
+func UpdateUserProfile(w http.ResponseWriter, r *http.Request) {
+	var u models.User
+	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	query := `UPDATE users SET full_name = ?, email = ?, phone_number = ? WHERE id = ?`
+	_, err := db.DB.Exec(query, u.Name, u.Email, u.PhoneNumber, u.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(u)
 }
