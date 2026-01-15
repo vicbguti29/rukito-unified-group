@@ -17,7 +17,7 @@ class RukitoApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // Cambiar a ApiService() para usar backend real
     // o MockApiService() para desarrollo sin backend
-    final IApiService apiService = MockApiService();
+    final IApiService apiService = ApiService();
 
     return MultiProvider(
       providers: [
