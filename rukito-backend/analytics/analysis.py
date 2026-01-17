@@ -168,24 +168,45 @@ def get_chamber_kpis(db: Session, sensor_id: str, timeframe_minutes: int = 30):
     if expected_readings > 0:
         uptime = round(min((actual_readings / expected_readings) * 100.0, 100.0), 2)
 
-    # 6. Texto de Análisis (Insights Generados)
-    analysis_text = "Operación estable."
-    if critical_alerts > 5:
-        analysis_text = f"ALTO RIESGO: Se detectaron {critical_alerts} eventos críticos. Revisar compresor inmediatamente."
-    elif hours_at_risk > 0.5:
-        analysis_text = f"ADVERTENCIA: La cadena de frío se rompió por {round(hours_at_risk*60)} minutos acumulados."
-    elif total_alerts > 0:
-        analysis_text = "Se observaron desviaciones menores. Verificar cierre de puertas."
+    # 6. Texto de Análisis (Insights Generados para el Requisito de Análisis)
+    # Pregunta 1: Tasa de Cambio (dT/dt)
+    avg_rate = calculate_rate_of_change(db, sensor_id, timeframe_minutes)
+    if avg_rate > 0.1:
+        analysis_rate_text = f"Alerta de Inercia: La temperatura sube a {avg_rate}°C/min. Indica posible fallo de aislamiento o puerta abierta."
+    elif avg_rate < -0.1:
+        analysis_rate_text = f"Enfriamiento rápido detectado ({avg_rate}°C/min). El compresor está operando a máxima potencia."
+    else:
+        analysis_rate_text = "Estabilidad térmica detectada. La tasa de cambio es mínima, indicando buen sellado."
+
+    # Pregunta 2: Tiempo en Riesgo
+    if hours_at_risk > 4.0:
+        analysis_risk_text = f"CRÍTICO: Exposición de {round(hours_at_risk, 1)}h supera el límite de seguridad. Riesgo de decomiso."
+    elif hours_at_risk > 0:
+        analysis_risk_text = f"Advertencia: {round(hours_at_risk, 1)}h fuera de rango. Se recomienda inspección de calidad del lote."
+    else:
+        analysis_risk_text = "Sin exposición crítica. La cadena de frío se ha mantenido dentro de los parámetros legales."
+
+    # Pregunta 3: Impacto Económico
+    if estimated_cost > 1000:
+        analysis_cost_text = f"Impacto Financiero ALTO. Pérdida proyectada de ${estimated_cost}. Requiere mitigación inmediata."
+    elif estimated_cost > 0:
+        analysis_cost_text = f"Impacto Financiero Moderado (${estimated_cost}). Dentro del margen de merma operativa."
+    else:
+        analysis_cost_text = "Sin impacto económico. El valor del inventario no se ha visto comprometido."
 
     return {
         "chamber_id": sensor_id,
         "total_alerts": total_alerts,
         "critical_alerts": critical_alerts,
-        "hours_at_risk": round(hours_at_risk, 4),
-        "estimated_cost": estimated_cost,
+        "hours_at_risk": round(hours_at_risk, 2), # Para el grid superior
+        "total_risk_hours": round(hours_at_risk, 2), # Para Insights
+        "estimated_cost": estimated_cost, # Para el grid superior
+        "monthly_cost": estimated_cost, # Para Insights (Alias)
+        "avg_rate_of_change": avg_rate,
         "uptime_percentage": uptime,
         "alert_causes": alert_causes,
-        "analysis_risk_text": analysis_text,
-        # Campos extra opcionales para debug
+        "analysis_rate_text": analysis_rate_text,
+        "analysis_risk_text": analysis_risk_text,
+        "analysis_cost_text": analysis_cost_text,
         "period_minutes": timeframe_minutes
     }
