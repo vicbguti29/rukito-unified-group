@@ -28,22 +28,6 @@ func main() {
 	// Initialize Router
 	r := mux.NewRouter()
 
-	// Middleware for CORS and JSON
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-			
-			if r.Method == "OPTIONS" {
-				w.WriteHeader(http.StatusOK)
-				return
-			}
-			
-			next.ServeHTTP(w, r)
-		})
-	})
-
 	// Routes
 	apiRouter := r.PathPrefix("/api").Subrouter()
 	apiRouter.HandleFunc("/health", api.GetHealth).Methods("GET")
@@ -67,8 +51,24 @@ func main() {
 	}
 
 	fmt.Printf("Rukito Backend Server Running on port %s...\n", port)
-	
-	if err := http.ListenAndServe(":"+port, r); err != nil {
+
+	// Global CORS Handler
+	corsHandler := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	if err := http.ListenAndServe(":"+port, corsHandler(r)); err != nil {
 		log.Fatal(err)
 	}
 }
