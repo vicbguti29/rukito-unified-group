@@ -123,6 +123,8 @@ func GetReadingHistory(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	readings := []models.TemperatureReading{}
+	var rawReadings []models.TemperatureReading
+
 	for rows.Next() {
 		var tr models.TemperatureReading
 		var timestampBytes []byte
@@ -142,7 +144,61 @@ func GetReadingHistory(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		readings = append(readings, tr)
+		rawReadings = append(rawReadings, tr)
+	}
+	
+	// Downsampling Logic (AVERAGE)
+	// Target: ~100 points maximum for clear visualization (High Resolution Smooth)
+	const targetPoints = 100
+	totalCount := len(rawReadings)
+	
+	if totalCount <= targetPoints {
+		readings = rawReadings
+	} else {
+		step := totalCount / targetPoints
+		if step < 1 { step = 1 }
+		
+		for i := 0; i < totalCount; i += step {
+			end := i + step
+			if end > totalCount {
+				end = totalCount
+			}
+
+			// Calculate Average for this chunk
+			var sumTemp float64
+			var count int
+			
+			// Track max severity in this chunk for status
+			// We want the status to reflect the worst case in the chunk, even if we average the temp
+			worstStatus := "NORMAL"
+			
+			for j := i; j < end; j++ {
+				sumTemp += rawReadings[j].Temperature
+				count++
+				
+				// Basic priority check for status (Critical > Warning > Normal)
+				currentStatus := rawReadings[j].Status
+				if currentStatus == "CRITICAL_HOT" || currentStatus == "CRITICAL_COLD" {
+					worstStatus = currentStatus
+				} else if (currentStatus == "WARNING_HOT" || currentStatus == "WARNING_COLD") && worstStatus == "NORMAL" {
+					worstStatus = currentStatus
+				}
+			}
+
+			if count > 0 {
+				avgTemp := sumTemp / float64(count)
+				
+				// Create a representative reading
+				// We use the timestamp of the middle of the chunk for better alignment
+				midIndex := i + (count / 2)
+				repReading := rawReadings[midIndex]
+				
+				repReading.Temperature = avgTemp
+				repReading.Status = worstStatus // Preserve the worst status of the block
+				
+				readings = append(readings, repReading)
+			}
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

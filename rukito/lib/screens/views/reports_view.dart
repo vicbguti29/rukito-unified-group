@@ -845,27 +845,7 @@ class _ReportsViewState extends State<ReportsView> {
               show: true,
               color: AppColors.info.withOpacity(0.05),
             ),
-            dotData: FlDotData(
-              show: true,
-              checkToShowDot: (spot, barData) {
-                return spot.y >= warningLevel || spot.y <= criticalColdLevel;
-              },
-              getDotPainter: (spot, percent, barData, index) {
-                final isCriticalHot = spot.y >= criticalLevel;
-                final isCriticalCold = spot.y <= criticalColdLevel;
-                
-                Color dotColor = AppColors.warning;
-                if (isCriticalHot) dotColor = AppColors.critical;
-                if (isCriticalCold) dotColor = Colors.blue;
-
-                return FlDotCirclePainter(
-                  radius: 5,
-                  color: dotColor,
-                  strokeWidth: 2,
-                  strokeColor: Colors.white,
-                );
-              },
-            ),
+            dotData: const FlDotData(show: false),
           ),
         ],
         lineTouchData: LineTouchData(
@@ -875,7 +855,7 @@ class _ReportsViewState extends State<ReportsView> {
               return touchedBarSpots.map((barSpot) {
                 final date = _history[barSpot.x.toInt()].timestamp;
                 return LineTooltipItem(
-                  '${barSpot.y}°C\n${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+                  '${barSpot.y.toStringAsFixed(1)}°C\n${date.hour}:${date.minute.toString().padLeft(2, '0')}',
                   const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 );
               }).toList();

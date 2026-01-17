@@ -24,15 +24,24 @@ def get_average_meat_price():
             
     return 25.50
 
-def calculate_rate_of_change(db: Session, sensor_id: str, minutes: int = 30):
-    query = text("""
+def calculate_rate_of_change(db: Session, sensor_id: str, minutes: int = 30, start_date: str = None, end_date: str = None):
+    params = {"sensor_id": sensor_id, "minutes": minutes}
+    
+    if start_date and end_date:
+        where_clause = "AND timestamp BETWEEN :start AND :end"
+        params["start"] = start_date
+        params["end"] = end_date
+    else:
+        where_clause = "AND timestamp >= NOW() - INTERVAL :minutes MINUTE"
+
+    query = text(f"""
         SELECT temperature, timestamp 
         FROM temperature_readings 
         WHERE sensor_id = :sensor_id 
-        AND timestamp >= NOW() - INTERVAL :minutes MINUTE
+        {where_clause}
         ORDER BY timestamp ASC
     """)
-    result = db.execute(query, {"sensor_id": sensor_id, "minutes": minutes}).fetchall()
+    result = db.execute(query, params).fetchall()
     
     if len(result) < 2:
         return 0.0
@@ -48,7 +57,30 @@ def calculate_rate_of_change(db: Session, sensor_id: str, minutes: int = 30):
         
     return round(temp_diff / time_diff, 4)
 
-def get_chamber_kpis(db: Session, sensor_id: str, timeframe_minutes: int = 30):
+def get_chamber_kpis(db: Session, sensor_id: str, timeframe_minutes: int = 30, start_date: str = None, end_date: str = None):
+    # Base Params
+    params = {"sensor_id": sensor_id, "minutes": timeframe_minutes}
+    
+    # Logic for Date Range vs Rolling Window
+    if start_date and end_date:
+        time_condition = "AND timestamp BETWEEN :start AND :end"
+        params["start"] = start_date
+        params["end"] = end_date
+        
+        # Calculate expected minutes from date range for uptime
+        try:
+            # Simple approximation or parsing if strict precision needed
+            # Assuming ISO format coming from FastAPI
+            s = pd.to_datetime(start_date)
+            e = pd.to_datetime(end_date)
+            diff_mins = (e - s).total_seconds() / 60.0
+            expected_minutes = max(1.0, diff_mins)
+        except:
+            expected_minutes = float(timeframe_minutes)
+    else:
+        time_condition = "AND timestamp >= NOW() - INTERVAL :minutes MINUTE"
+        expected_minutes = float(timeframe_minutes)
+
     # 1. Obtener Umbrales desde alert_configs
     query_config = text("""
         SELECT threshold_critical_cold, threshold_critical_hot, threshold_warning_hot
@@ -65,27 +97,16 @@ def get_chamber_kpis(db: Session, sensor_id: str, timeframe_minutes: int = 30):
         crit_hot = float(config_row[1])
 
     # 2. Calcular Tiempo en Riesgo
-    # Downsampling: Si el periodo es > 24h, agrupamos por hora en SQL para eficiencia
-    if timeframe_minutes >= 1440:
-        query_text = """
-            SELECT DATE_FORMAT(timestamp, '%Y-%m-%d %H:00:00') as ts, AVG(temperature) as temp
-            FROM temperature_readings
-            WHERE sensor_id = :sensor_id 
-            AND timestamp >= NOW() - INTERVAL :minutes MINUTE
-            GROUP BY ts
-            ORDER BY ts ASC
-        """
-    else:
-        query_text = """
-            SELECT timestamp, temperature
-            FROM temperature_readings
-            WHERE sensor_id = :sensor_id 
-            AND timestamp >= NOW() - INTERVAL :minutes MINUTE
-            ORDER BY timestamp ASC
-        """
+    query_text = f"""
+        SELECT timestamp, temperature
+        FROM temperature_readings
+        WHERE sensor_id = :sensor_id 
+        {time_condition}
+        ORDER BY timestamp ASC
+    """
     
     query_raw_risk = text(query_text)
-    risk_rows = db.execute(query_raw_risk, {"sensor_id": sensor_id, "minutes": timeframe_minutes}).fetchall()
+    risk_rows = db.execute(query_raw_risk, params).fetchall()
     
     hours_at_risk = 0.0
     
@@ -112,14 +133,14 @@ def get_chamber_kpis(db: Session, sensor_id: str, timeframe_minutes: int = 30):
     estimated_cost = round(risk_factor * (avg_price_kg * ASSUMED_INVENTORY_KG), 2)
 
     # 4. Conteo de Alertas
-    query_alerts = text("""
+    query_alerts = text(f"""
         SELECT severity, category, COUNT(*) as count
         FROM alerts 
         WHERE sensor_id = :sensor_id 
-        AND timestamp >= NOW() - INTERVAL :minutes MINUTE
+        {time_condition}
         GROUP BY severity, category
     """)
-    alerts_result = db.execute(query_alerts, {"sensor_id": sensor_id, "minutes": timeframe_minutes}).fetchall()
+    alerts_result = db.execute(query_alerts, params).fetchall()
     
     total_alerts = 0
     critical_alerts = 0
@@ -158,19 +179,20 @@ def get_chamber_kpis(db: Session, sensor_id: str, timeframe_minutes: int = 30):
         alert_causes["Indeterminado"] = total_alerts
 
     # 5. Uptime
-    expected_readings = float(timeframe_minutes * 12)
-    query_readings_count = text("""
+    # Se asume 1 lectura por minuto como el estándar del sistema
+    expected_readings = expected_minutes
+    query_readings_count = text(f"""
         SELECT COUNT(*) FROM temperature_readings 
-        WHERE sensor_id = :sensor_id AND timestamp >= NOW() - INTERVAL :minutes MINUTE
+        WHERE sensor_id = :sensor_id {time_condition}
     """)
-    actual_readings = db.execute(query_readings_count, {"sensor_id": sensor_id, "minutes": timeframe_minutes}).scalar() or 0
+    actual_readings = db.execute(query_readings_count, params).scalar() or 0
     uptime = 0.0
     if expected_readings > 0:
         uptime = round(min((actual_readings / expected_readings) * 100.0, 100.0), 2)
 
     # 6. Texto de Análisis (Insights Generados para el Requisito de Análisis)
     # Pregunta 1: Tasa de Cambio (dT/dt)
-    avg_rate = calculate_rate_of_change(db, sensor_id, timeframe_minutes)
+    avg_rate = calculate_rate_of_change(db, sensor_id, timeframe_minutes, start_date, end_date)
     if avg_rate > 0.1:
         analysis_rate_text = f"Alerta de Inercia: La temperatura sube a {avg_rate}°C/min. Indica posible fallo de aislamiento o puerta abierta."
     elif avg_rate < -0.1:

@@ -82,20 +82,36 @@ func GetChambers(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// SUBQUERY: Obtener ultimas 20 lecturas para el sparkline (grafico pequeño)
+		// SUBQUERY: Obtener ultimas 180 lecturas (3 horas) para downsampling
 		// Nota: Esto es N+1 queries, pero para 3 camaras es despreciable.
-		// En produccion usariamos un JOIN complejo o una tabla cacheada.
-		recentRows, err := db.DB.Query("SELECT temperature FROM temperature_readings WHERE sensor_id = ? ORDER BY timestamp DESC LIMIT 20", c.ID)
+		recentRows, err := db.DB.Query("SELECT temperature FROM temperature_readings WHERE sensor_id = ? ORDER BY timestamp DESC LIMIT 180", c.ID)
 		if err == nil {
 			var temps []float64
+			var rawTemps []float64
+			
+			// 1. Fetch raw data (reverse order: newest first)
 			for recentRows.Next() {
 				var t float64
 				if err := recentRows.Scan(&t); err == nil {
-					temps = append(temps, t)
+					rawTemps = append(rawTemps, t)
 				}
 			}
 			recentRows.Close()
-			// Invertir para orden cronologico (izquierda a derecha en el grafico)
+
+			// 2. Downsampling: Take every 9th record (180 / 9 = 20 points)
+			// This gives us a 3-hour trend with 20 points
+			step := 9
+			if len(rawTemps) < 40 {
+				step = 1 // Keep all if not enough data
+			}
+
+			for i := 0; i < len(rawTemps); i += step {
+				temps = append(temps, rawTemps[i])
+			}
+
+			// 3. Invertir para orden cronologico (izquierda a derecha en el grafico)
+			// rawTemps was Newest -> Oldest. temps is Newest -> Oldest (subset).
+			// We need Oldest -> Newest.
 			for i, j := 0, len(temps)-1; i < j; i, j = i+1, j-1 {
 				temps[i], temps[j] = temps[j], temps[i]
 			}

@@ -11,13 +11,13 @@ def health_check():
     return {"status": "analytics_ok", "timestamp": datetime.datetime.now().isoformat()}
 
 @app.get("/analyze/report/{chamber_id}")
-def get_report(chamber_id: str, minutes: int = 30, db: Session = Depends(get_db)):
+def get_report(chamber_id: str, minutes: int = 30, start: str = None, end: str = None, db: Session = Depends(get_db)):
     """
     Endpoint principal de análisis consumido por el Backend Go.
-    El parámetro 'minutes' permite ajustar el rango del reporte (default 30 min).
+    Ahora soporta fechas absolutas (start/end en ISO8601) o ventana móvil (minutes).
     """
     try:
-        data = analysis.get_chamber_kpis(db, chamber_id, timeframe_minutes=minutes)
+        data = analysis.get_chamber_kpis(db, chamber_id, timeframe_minutes=minutes, start_date=start, end_date=end)
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

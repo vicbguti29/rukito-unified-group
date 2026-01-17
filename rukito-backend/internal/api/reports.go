@@ -36,6 +36,10 @@ func GetReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	targetURL := fmt.Sprintf("%s/analyze/report/%s?minutes=%d", pythonURL, chamberID, minutes)
+	
+	if startStr != "" && endStr != "" {
+		targetURL += fmt.Sprintf("&start=%s&end=%s", startStr, endStr)
+	}
 
 	fmt.Printf("Go Backend: Requesting report from Python service at %s\n", targetURL)
 
