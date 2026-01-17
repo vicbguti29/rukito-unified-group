@@ -67,10 +67,13 @@ Para levantar toda la infraestructura del servidor (Responsabilidad: Angello Vá
 *   **MySQL** (8.0+) corriendo en local o Docker.
 
 ### 2. Configuración de Base de Datos
-Ejecuta el script SQL para crear la base de datos y cargar datos iniciales:
+Ejecuta el script SQL para crear la base de datos con sus tablas:
 ```bash
 # Desde la raíz del repositorio (rukito-unified-group/)
 mysql -u root -p < rukito-backend/scripts/setup.sql
+
+# existe otro archivo que llena la base de datos con datos de prueba de 3 dias,
+# este archivo lo ejecutaremos despues de configurar el backend y el servicio de analitico (py)
 ```
 
 ### 3. Configuración del Entorno
@@ -127,6 +130,32 @@ pip install -r requirements.txt
 uvicorn main:app --port 8000 --reload
 ```
 *El servicio escuchará en `http://localhost:8000`.*
+
+---
+
+### 6. Poblar la BD con datos para demostración
+Haremos uso del entorno virtual creado para el servicio de analítica en el paso anterior.
+Mostraremos dos formas para ejecutar `seed_data.py`, usar la que mas le convenga.
+
+*Ejecución desde la carpeta `/analytics`*
+```bash
+# situandonos en la misma carpeta del paso anterior
+# con el entorno virtual activado
+# Ejecutar el archivo que pobla la BD
+python3 ../scripts/seed_data.py
+```
+
+*Ejecución desde la carpeta raiz `/rukito-unified-group`*
+```bash
+# situandonos en la carpeta raíz activamos el entorno virtual de la carpeta /analytics
+source rukito-backend/analytics/venv/bin/activate  
+# En Windows: rukito-backend\analytics\venv\Scripts\activate
+
+# Ejecutar el archivo que pobla la BD
+python3 rukito-backend/scripts/seed_data.py
+```
+
+
 
 ---
 

@@ -45,12 +45,13 @@ func GetChambers(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var c models.ColdChamber
 		var contentDesc sql.NullString
+		var location sql.NullString
 		var model sql.NullString
 		var lastUpdateStr string // Scan as string/bytes or Time depending on driver
 
 		// Scan
 		err := rows.Scan(
-			&c.ID, &c.Name, &contentDesc, &c.Location, &model, &c.IsActive, &c.LastUpdate, // updated_at from chambers (fallback)
+			&c.ID, &c.Name, &contentDesc, &location, &model, &c.IsActive, &c.LastUpdate, // updated_at from chambers (fallback)
 			&c.TargetTemperature,
 			&c.CurrentTemperature,
 			&c.RateOfChange,
@@ -64,6 +65,7 @@ func GetChambers(w http.ResponseWriter, r *http.Request) {
 
 		// Handle Nullables
 		if contentDesc.Valid { c.Content = contentDesc.String }
+		if location.Valid { c.Location = location.String }
 		if model.Valid { c.Model = model.String }
 		
 		// Parse timestamp from DB (MySQL driver might return []byte or string)
@@ -134,11 +136,12 @@ func GetChamber(w http.ResponseWriter, r *http.Request) {
 
 	var c models.ColdChamber
 	var contentDesc sql.NullString
+	var location sql.NullString
 	var model sql.NullString
 	var lastUpdateRaw []byte // Scanning into bytes to be safe
 
 	err := row.Scan(
-		&c.ID, &c.Name, &contentDesc, &c.Location, &model, &c.IsActive, &c.LastUpdate,
+		&c.ID, &c.Name, &contentDesc, &location, &model, &c.IsActive, &c.LastUpdate,
 		&c.TargetTemperature,
 		&c.CurrentTemperature,
 		&c.RateOfChange,
@@ -155,6 +158,7 @@ func GetChamber(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if contentDesc.Valid { c.Content = contentDesc.String }
+	if location.Valid { c.Location = location.String }
 	if model.Valid { c.Model = model.String }
 	
 	if len(lastUpdateRaw) > 0 {
