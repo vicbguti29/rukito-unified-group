@@ -4,7 +4,8 @@ class AppConfig {
 
   /// URL base del servidor backend
   /// Cambiar según el entorno (desarrollo, staging, producción)
-  static const String apiBaseUrl = 'http://localhost:8080/api';
+  /// URL base del servidor backend para producción en Render
+  static const String apiBaseUrl = 'https://rukito-api.onrender.com/api';
 
   /// Timeout para peticiones HTTP (en segundos)
   static const int apiTimeout = 10;
@@ -76,8 +77,7 @@ class EnvironmentConfig {
 
   /// Obtiene la configuración según el entorno
   static String getEnvironment() {
-    // Cambiar a 'production' para despliegue final
-    return development;
+    return production;
   }
 
   /// URLs por entorno
@@ -86,7 +86,7 @@ class EnvironmentConfig {
       case staging:
         return 'http://staging-api.rukito.local:8080/api';
       case production:
-        return 'https://api.rukito.com/api';
+        return 'https://rukito-api.onrender.com/api';
       case development:
       default:
         return 'http://localhost:8080/api';
