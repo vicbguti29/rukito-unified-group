@@ -20,7 +20,8 @@ func InitDB() {
 	dbName := os.Getenv("DB_NAME")
 
 	// DSN (Data Source Name)
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true", dbUser, dbPassword, dbHost, dbPort, dbName)
+	// Agregamos parseTime=true y tls=skip-verify para compatibilidad con Aiven/Cloud
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&tls=skip-verify", dbUser, dbPassword, dbHost, dbPort, dbName)
 
 	var err error
 	DB, err = sql.Open("mysql", dsn)
