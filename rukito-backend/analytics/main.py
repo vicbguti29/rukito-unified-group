@@ -6,6 +6,7 @@ import datetime
 
 app = FastAPI(title="Rukito Analytics Service")
 
+@app.get("/")
 @app.get("/health")
 def health_check():
     return {"status": "analytics_ok", "timestamp": datetime.datetime.now().isoformat()}

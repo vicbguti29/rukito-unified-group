@@ -29,6 +29,7 @@ func main() {
 	r := mux.NewRouter()
 
 	// Routes
+	r.HandleFunc("/", api.GetHealth).Methods("GET")
 	apiRouter := r.PathPrefix("/api").Subrouter()
 	apiRouter.HandleFunc("/health", api.GetHealth).Methods("GET")
 	apiRouter.HandleFunc("/chambers", api.GetChambers).Methods("GET")
