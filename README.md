@@ -4,6 +4,12 @@ Proyecto universitario para el monitoreo concurrente en tiempo real de cámaras 
 
 ---
 
+## 🌐 Live Public Showcase
+**[Visualiza el Dashboard en Vivo Aquí](https://vicbguti29.github.io/rukito-unified-group/)** 🚀
+*(Nota: Requiere que el backend esté desplegado en la nube para ver datos en tiempo real).*
+
+---
+
 ## 🏛️ Arquitectura del Sistema
 
 El proyecto sigue una arquitectura de microservicios híbrida:
@@ -188,6 +194,44 @@ Documentación técnica detallada para desarrolladores e integradores.
 *   **[Manual de Analítica (Python)](rukito-backend/docs/MANUAL_ANALYTICS_PYTHON.md):** Algoritmos financieros y de riesgo.
 *   **[Manual de Tests](rukito-backend/docs/MANUAL_TESTS.md):** Guía detallada de la suite de pruebas del servidor (Backend y Analítica).
 *   **[Arquitectura del Sistema](rukito-backend/docs/SYSTEM_ARCHITECTURE.md):** Diagramas de flujo y ciclo de vida del dato.
+
+---
+
+## ☁️ Despliegue Global (Cloud)
+
+Para que el sistema esté accesible 24/7 desde cualquier parte del mundo:
+
+### 1. Base de Datos (MySQL Cloud)
+- Recomendado: **Aiven** o **Clever Cloud**.
+- Crea una instancia gratuita de MySQL.
+- Actualiza las variables de entorno `DB_HOST`, `DB_USER`, etc., con los datos proporcionados por el proveedor.
+
+### 2. Microservicios (Go & Python)
+- Recomendado: **Render** o **Railway**.
+- Ambos servicios cuentan con `Dockerfile` en sus respectivas carpetas para un despliegue sencillo.
+- Sube el código a GitHub y conecta los servicios a Render/Railway.
+
+### 3. Frontend (GitHub Pages)
+- El build web ya está generado en `rukito/build/web`.
+- Para desplegar:
+  ```bash
+  cd rukito/build/web
+  git init
+  git remote add origin https://github.com/vicbguti29/rukito-unified-group.git
+  git add .
+  git commit -m "Deploy to GitHub Pages"
+  git push -f origin master:gh-pages
+  ```
+
+---
+
+## 🚀 Script de Demostración Rápida (Showcase)
+
+Si deseas mostrarlo localmente con un solo clic, utiliza el script:
+```powershell
+./showcase.ps1
+```
+*Este script iniciará automáticamente MySQL (si está configurado), el servidor Go, el servicio de Python y abrirá la aplicación en tu navegador.*
 
 ---
 
