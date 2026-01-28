@@ -2,12 +2,12 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt .
+# Install dependencies from the analytics subfolder
+COPY rukito-backend/analytics/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
-COPY . .
+# Copy source code from the analytics subfolder
+COPY rukito-backend/analytics/ .
 
 EXPOSE 8000
 

@@ -2,15 +2,15 @@ services:
   # Backend Core (Go)
   - type: web
     name: rukito-api
-    env: docker
-    dockerContext: rukito-backend
-    dockerfilePath: Dockerfile
     plan: free
+    env: docker
+    dockerContext: .
+    dockerfilePath: rukito-backend/Dockerfile
     envVars:
       - key: DB_HOST
         sync: false
       - key: DB_PORT
-        value: 3306
+        value: "3306"
       - key: DB_USER
         sync: false
       - key: DB_PASSWORD
@@ -18,7 +18,7 @@ services:
       - key: DB_NAME
         sync: false
       - key: SERVER_PORT
-        value: 8080
+        value: "8080"
       - key: PYTHON_SERVICE_URL
         fromService:
           name: rukito-analytics
@@ -28,15 +28,15 @@ services:
   # Analytics Service (Python)
   - type: web
     name: rukito-analytics
-    env: docker
-    dockerContext: rukito-backend/analytics
-    dockerfilePath: Dockerfile
     plan: free
+    env: docker
+    dockerContext: .
+    dockerfilePath: rukito-backend/analytics/Dockerfile
     envVars:
       - key: DB_HOST
         sync: false
       - key: DB_PORT
-        value: 3306
+        value: "3306"
       - key: DB_USER
         sync: false
       - key: DB_PASSWORD

@@ -3,12 +3,12 @@ FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
-# Copy go mod and sum files
-COPY go.mod go.sum ./
+# Copy go mod and sum files from the backend subfolder
+COPY rukito-backend/go.mod rukito-backend/go.sum ./
 RUN go mod download
 
-# Copy the source code
-COPY . .
+# Copy the rest of the backend source code
+COPY rukito-backend/ .
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server/main.go
@@ -20,8 +20,9 @@ WORKDIR /root/
 
 # Copy the pre-built binary
 COPY --from=builder /app/main .
-# Copy .env example or handle it via environment variables in the cloud
-COPY .env.example .env
+# El archivo .env se manejará mediante variables de entorno en Render
+# Pero copiamos el example por si acaso
+COPY rukito-backend/.env.example .env
 
 EXPOSE 8080
 
