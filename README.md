@@ -215,7 +215,11 @@ Para que el sistema esté accesible 24/7 desde cualquier parte del mundo:
 - El build web ya está generado en `rukito/build/web`.
 - Para desplegar:
   ```bash
-  cd rukito/build/web
+  cd rukito
+  # Reemplaza 'rukito-unified-group' por el nombre exacto de tu repositorio
+  flutter build web --release --base-href "/rukito-unified-group/" --web-renderer canvaskit
+  
+  cd build/web
   git init
   git remote add origin https://github.com/vicbguti29/rukito-unified-group.git
   git add .
