@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -36,12 +37,12 @@ func GetReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	targetURL := fmt.Sprintf("%s/analyze/report/%s?minutes=%d", pythonURL, chamberID, minutes)
-	
+
 	if startStr != "" && endStr != "" {
 		targetURL += fmt.Sprintf("&start=%s&end=%s", startStr, endStr)
 	}
 
-	fmt.Printf("Go Backend: Requesting report from Python service at %s\n", targetURL)
+	log.Printf("Internal Proxy: Calling Analytics at %s", targetURL)
 
 	resp, err := http.Get(targetURL)
 	if err != nil {

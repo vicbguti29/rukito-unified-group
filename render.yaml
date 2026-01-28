@@ -20,10 +20,7 @@ services:
       - key: SERVER_PORT
         value: "8080"
       - key: PYTHON_SERVICE_URL
-        fromService:
-          name: rukito-analytics
-          type: web
-          property: host
+        value: http://rukito-analytics:8000
 
   # Analytics Service (Python)
   - type: web
