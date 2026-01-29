@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -20,21 +21,28 @@ func InitDB() {
 	dbName := os.Getenv("DB_NAME")
 
 	// DSN (Data Source Name)
-	// Agregamos parseTime=true y tls=skip-verify para compatibilidad con Aiven/Cloud
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&tls=skip-verify", dbUser, dbPassword, dbHost, dbPort, dbName)
 
 	var err error
 	DB, err = sql.Open("mysql", dsn)
 	if err != nil {
-		log.Fatal("Error opening database connection: ", err)
+		log.Printf("Warning: Error opening DB connection: %v. Retrying...", err)
 	}
 
-	// Verify connection
-	if err = DB.Ping(); err != nil {
-		log.Fatal("Error connecting to the database: ", err)
+	// Retry logic for cloud environments
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		fmt.Printf("Connecting to DB (Attempt %d/%d)...\n", i+1, maxRetries)
+		err = DB.Ping()
+		if err == nil {
+			fmt.Println("✅ Successfully connected to MySQL database")
+			return
+		}
+		log.Printf("❌ Connection attempt failed: %v. Waiting 5s before next attempt...", err)
+		time.Sleep(5 * time.Second)
 	}
 
-	fmt.Println("Successfully connected to MySQL database")
+	log.Println("⚠️ Final warning: Could not verify DB connection after several attempts. Server will start anyway to provide health signals.")
 }
 
 // GetDB returns the database instance
