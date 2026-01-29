@@ -48,7 +48,7 @@ func GetReport(w http.ResponseWriter, r *http.Request) {
 		targetURL += fmt.Sprintf("&start=%s&end=%s", startStr, endStr)
 	}
 
-	log.Printf("Internal Proxy: Calling Analytics at %s", targetURL)
+	log.Printf("[V2_FINAL_STABLE] Internal Proxy: Calling Analytics at %s", targetURL)
 
 	resp, err := http.Get(targetURL)
 	if err != nil {
