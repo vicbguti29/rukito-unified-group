@@ -50,18 +50,26 @@ func GetReport(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[V2_FINAL_STABLE] Internal Proxy: Calling Analytics at %s", targetURL)
 
-	resp, err := http.Get(targetURL)
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Get(targetURL)
 	if err != nil {
-		http.Error(w, "Failed to connect to Analytics service: "+err.Error(), http.StatusServiceUnavailable)
+		log.Printf("❌ Internal Proxy Error: Failed to connect to Analytics at %s: %v", targetURL, err)
+		http.Error(w, fmt.Sprintf("Failed to connect to Analytics service: %v", err), http.StatusServiceUnavailable)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		http.Error(w, fmt.Sprintf("Analytics service error: %s", string(body)), resp.StatusCode)
+		log.Printf("❌ Internal Proxy Error: Analytics service returned status %d. Body: %s", resp.StatusCode, string(body))
+		http.Error(w, fmt.Sprintf("Analytics service error (Status %d): %s", resp.StatusCode, string(body)), resp.StatusCode)
 		return
 	}
+
+	log.Printf("✅ Internal Proxy Success: Received response from %s", targetURL)
 
 	w.Header().Set("Content-Type", "application/json")
 	io.Copy(w, resp.Body)
