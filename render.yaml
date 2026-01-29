@@ -20,7 +20,7 @@ services:
       - key: SERVER_PORT
         value: "8080"
       - key: PYTHON_SERVICE_URL
-        value: http://rukito-analytics:8000
+        value: https://rukito-analytics.onrender.com
 
   # Analytics Service (Python)
   - type: web
