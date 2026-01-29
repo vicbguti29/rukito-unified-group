@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -34,6 +35,11 @@ func GetReport(w http.ResponseWriter, r *http.Request) {
 	pythonURL := os.Getenv("PYTHON_SERVICE_URL")
 	if pythonURL == "" {
 		pythonURL = "http://localhost:8000"
+	}
+
+	// Ensure we have a protocol (Render 'host' property usually omits it)
+	if !strings.HasPrefix(pythonURL, "http://") && !strings.HasPrefix(pythonURL, "https://") {
+		pythonURL = "http://" + pythonURL
 	}
 
 	targetURL := fmt.Sprintf("%s/analyze/report/%s?minutes=%d", pythonURL, chamberID, minutes)
